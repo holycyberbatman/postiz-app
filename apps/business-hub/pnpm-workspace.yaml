@@ -1,0 +1,3 @@
+# Deploy this Worker independently from Postiz's Node/Temporal dependency tree.
+packages:
+  - .
