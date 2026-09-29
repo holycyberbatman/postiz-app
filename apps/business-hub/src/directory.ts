@@ -1,9 +1,11 @@
+import { z } from 'zod';
+import type { Actor } from './model';
 import { DurableObject } from 'cloudflare:workers';
 import type { Env } from './env';
 import { json, errorResponse, HubError, businessSchema } from './model';
 import { hash, seal, unseal } from './crypto';
 
-export type OAuthState = { businessId: string; verifier: string; cookieHash: string; expiresAt: number; redirectUri: string };
+export type OAuthState = { businessId: string; actor?: Actor; verifier: string; cookieHash: string; expiresAt: number; redirectUri: string };
 export class BusinessDirectory extends DurableObject<Env> {
   private pending: Promise<unknown> = Promise.resolve();
   async fetch(request: Request): Promise<Response> {
@@ -25,16 +27,17 @@ export class BusinessDirectory extends DurableObject<Env> {
           if (!result.ok && result.status !== 409) return result;
           const profile = await this.env.BUSINESSES.getByName(business.id).fetch('https://internal/operations', { method: 'POST', headers: { 'X-Hub-Actor': JSON.stringify({ id: 'admin', role: 'owner' }) }, body: JSON.stringify({ operation: 'get_business' }) });
           if (!profile.ok) return profile;
-          const actual = (await profile.json() as { business: { id: string; name: string } }).business;
-          await this.ctx.storage.put(`business:${business.id}`, { id: actual.id, name: actual.name });
+          const actual = (await profile.json() as { business: { id: string; name: string; managedService?: boolean } }).business;
+          await this.ctx.storage.put(`business:${business.id}`, { id: actual.id, name: actual.name, ...(actual.managedService ? { serviceStatus: 'onboarding' } : {}) });
           return json(actual, 201);
         })();
       }
       if (path === '/rename') {
-        const { id, name } = businessSchema.pick({ id: true, name: true }).parse(await request.json());
+        const summary = businessSchema.pick({ id: true, name: true }).extend({ serviceStatus: z.enum(['onboarding', 'review', 'active', 'paused']).optional(), team: z.string().max(120).optional(), nextReviewAt: z.string().datetime().optional() }).strict().parse(await request.json());
+        const { id } = summary;
         if (!await this.ctx.storage.get(`business:${id}`)) throw new HubError(404, 'Business not found');
-        await this.ctx.storage.put(`business:${id}`, { id, name });
-        return json({ id, name });
+        await this.ctx.storage.put(`business:${id}`, summary);
+        return json(summary);
       }
       if (path === '/oauth/create') {
         const { state, data } = await request.json() as { state: string; data: OAuthState };

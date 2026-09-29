@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { Env } from './env';
 import type { Actor } from './model';
-import { businessSchema, slugSchema, json, errorResponse, HubError, requireRole } from './model';
+import { businessSchema, slugSchema, json, errorResponse, HubError, requireRole, requireCompanyOrOwner } from './model';
 import { hash, randomToken, sameSecret } from './crypto';
 import { fanvue, fanvueToken } from './connectors';
 import { handleMcp } from './mcp';
@@ -25,11 +25,16 @@ async function authenticate(request: Request, env: Env): Promise<{ actor: Actor;
   if (!response.ok) throw new HubError(401, 'Token is invalid, expired, or revoked');
   return { actor: await response.json() as Actor, businessId: match[1] };
 }
-function workspace(env: Env, businessId: string, actor: Actor, operation: string, input: unknown = {}) {
-  return env.BUSINESSES.getByName(businessId).fetch('https://internal/operations', {
+async function workspace(env: Env, businessId: string, actor: Actor, operation: string, input: unknown = {}) {
+  const result = await env.BUSINESSES.getByName(businessId).fetch('https://internal/operations', {
     method: 'POST', headers: { 'X-Hub-Actor': JSON.stringify(actor), 'Content-Type': 'application/json' },
     body: JSON.stringify({ operation, input }),
   });
+  if (result.ok && ['update_business', 'save_onboarding', 'submit_onboarding', 'save_strategy', 'start_service', 'pause_service', 'record_review', 'connect_postiz', 'disconnect_channel'].includes(operation)) {
+    const summary = await env.BUSINESSES.getByName(businessId).fetch('https://internal/operations', { method: 'POST', headers: { 'X-Hub-Actor': JSON.stringify({ id: 'admin', role: 'owner' }) }, body: JSON.stringify({ operation: 'get_summary' }) });
+    if (summary.ok) await env.DIRECTORY.getByName('directory').fetch('https://internal/rename', { method: 'POST', body: await summary.text() });
+  }
+  return result;
 }
 function origin(env: Env, request: Request) {
   const value = env.PUBLIC_ORIGIN || new URL(request.url).origin;
@@ -64,7 +69,7 @@ async function route(request: Request, env: Env): Promise<Response> {
     const body = new TextDecoder().decode(buffer);
     request = new Request(request.url, { method: request.method, headers: request.headers, body: body || undefined });
   }
-  if (pathname === '/health') return json({ service: 'postiz-business-hub', status: env.HUB_ADMIN_TOKEN?.length >= 32 && env.TOKEN_ENCRYPTION_KEY ? 'ready' : 'setup_required', version: '0.1.0' });
+  if (pathname === '/health') return json({ service: 'postiz-business-hub', status: env.HUB_ADMIN_TOKEN?.length >= 32 && env.TOKEN_ENCRYPTION_KEY ? 'ready' : 'setup_required', version: '0.2.0' });
   if (pathname === '/api/session' && request.method === 'POST') {
     const { token } = z.object({ token: z.string().min(1).max(4096) }).strict().parse(await request.json());
     const auth = await authenticate(new Request(request.url, { headers: { Authorization: `Bearer ${token}` } }), env);
@@ -91,7 +96,7 @@ async function route(request: Request, env: Env): Promise<Response> {
     const profile = await fanvue(env, tokens.access_token, '/users/me');
     if (!profile.isCreator || typeof profile.uuid !== 'string') throw new HubError(400, 'Connect the Fanvue creator account for this business');
     const credential = { ...tokens, user: { uuid: profile.uuid, handle: profile.handle, displayName: profile.displayName, isAiCreator: profile.isAiCreator } };
-    const saved = await env.BUSINESSES.getByName(data.businessId).fetch('https://internal/fanvue-callback', { method: 'POST', body: JSON.stringify(credential) });
+    const saved = await env.BUSINESSES.getByName(data.businessId).fetch('https://internal/fanvue-callback', { method: 'POST', headers: { 'X-Hub-Actor': JSON.stringify(data.actor || { id: 'oauth', role: 'owner' }) }, body: JSON.stringify(credential) });
     if (!saved.ok) return saved;
     return new Response(null, { status: 303, headers: { Location: `${origin(env, request)}/?business=${data.businessId}&connected=fanvue`, 'Set-Cookie': sessionCookie(request, 'fanvue_state', '', 0, 'Lax') } });
   }
@@ -117,16 +122,17 @@ async function route(request: Request, env: Env): Promise<Response> {
     if (!match) throw new HubError(404, 'Not found');
     const businessId = slugSchema.parse(match[2]);
     if (auth.businessId && auth.businessId !== businessId) throw new HubError(403, 'This token belongs to another business');
+    if (match[1] === 'mcp' && auth.actor.role === 'company') throw new HubError(403, 'Company access is for the portal. Wood issues separate agent credentials.');
     if (match[1] === 'mcp' && !match[3]) return handleMcp(request, businessId, auth.actor, (operation, input) => workspace(env, businessId, auth.actor, operation, input));
     const operation = match[3] || 'get_business';
     if (operation === 'connect_fanvue' && request.method === 'POST') {
-      requireRole(auth.actor, 'owner');
+      requireCompanyOrOwner(auth.actor);
       if (!env.FANVUE_CLIENT_ID || !env.FANVUE_CLIENT_SECRET) throw new HubError(503, 'Configure FANVUE_CLIENT_ID and FANVUE_CLIENT_SECRET before connecting');
       const exists = await workspace(env, businessId, auth.actor, 'get_business');
       if (!exists.ok) return exists;
       const state = randomToken(); const verifier = randomToken(); const browserCookie = randomToken();
       const redirectUri = `${origin(env, request)}/oauth/fanvue/callback`;
-      const data: OAuthState = { businessId, verifier, cookieHash: await hash(browserCookie), expiresAt: Date.now() + 600000, redirectUri };
+      const data: OAuthState = { businessId, actor: auth.actor, verifier, cookieHash: await hash(browserCookie), expiresAt: Date.now() + 600000, redirectUri };
       const saved = await env.DIRECTORY.getByName('directory').fetch('https://internal/oauth/create', { method: 'POST', body: JSON.stringify({ state, data }) });
       if (!saved.ok) return saved;
       const authorize = new URL('https://auth.fanvue.com/oauth2/auth');
@@ -138,11 +144,6 @@ async function route(request: Request, env: Env): Promise<Response> {
     if (request.method === 'GET' && !match[3]) return workspace(env, businessId, auth.actor, 'get_business');
     if (request.method !== 'POST') throw new HubError(405, 'Use POST for business operations');
     const result = await workspace(env, businessId, auth.actor, operation, await request.json());
-    if (operation === 'update_business' && result.ok) {
-      const business = await result.clone().json() as { id: string; name: string };
-      const renamed = await env.DIRECTORY.getByName('directory').fetch('https://internal/rename', { method: 'POST', body: JSON.stringify({ id: business.id, name: business.name }) });
-      if (!renamed.ok) return renamed;
-    }
     return result;
   }
   if (!['GET', 'HEAD'].includes(request.method)) throw new HubError(405, 'Method not allowed');

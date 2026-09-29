@@ -14,7 +14,7 @@ assert.equal(health.status, 200);
 assert.equal((await health.json()).status, 'ready');
 const page = await request('/');
 assert.equal(page.status, 200);
-assert.match(await page.text(), /Business Hub/);
+assert.match(await page.text(), /Wood Enterprises/);
 assert.equal(page.headers.get('X-Frame-Options'), 'DENY');
 assert.equal((await request('/api/businesses')).status, 401);
 assert.equal((await request('/mcp/deployment-probe', { method: 'POST', body: '{}' })).status, 401);
@@ -34,6 +34,7 @@ try {
   await client.connect(new StreamableHTTPClientTransport(new URL('/mcp/deployment-probe', origin), { requestInit: { headers } }));
   const { tools } = await client.listTools();
   assert.ok(tools.some(tool => tool.name === 'get_business'));
+  assert.ok(tools.some(tool => tool.name === 'get_operating_brief'));
   assert.ok(!tools.some(tool => tool.name === 'issue_token'));
   console.log(JSON.stringify({ origin: origin.origin, health: 'ready', dashboard: 'passed', authentication: 'passed', sessionCookie: 'passed', originProtection: 'passed', mcpHandshake: 'passed', toolCount: tools.length, businessCount: businesses.length, writesToBusinesses: 0 }, null, 2));
 } finally {

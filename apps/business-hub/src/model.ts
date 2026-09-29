@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const roleSchema = z.enum(['reader', 'editor', 'publisher', 'owner']);
+export const roleSchema = z.enum(['reader', 'editor', 'publisher', 'owner', 'company']);
 export type Role = z.infer<typeof roleSchema>;
 export type Actor = { id: string; role: Role };
 export const slugSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{2,59}$/);
@@ -15,8 +15,40 @@ export const businessSchema = z.object({
   goals: z.array(z.string().max(500)).max(20).default([]),
   publishingMode: z.enum(['approval', 'automatic']).default('approval'),
   dailyPostLimit: z.number().int().min(1).max(100).default(10),
+  managedService: z.boolean().default(true),
 }).strict();
 export type Business = z.infer<typeof businessSchema>;
+const optionalWebUrl = z.string().max(2000).refine(value => {
+  if (!value) return true;
+  try { const url = new URL(value); return ['https:', 'http:'].includes(url.protocol) && !url.username && !url.password; } catch { return false; }
+}, 'Use an http or https URL without embedded credentials');
+export const briefSchema = z.object({
+  name: businessSchema.shape.name,
+  timezone: businessSchema.shape.timezone,
+  contactName: z.string().trim().max(120).default(''),
+  contactEmail: z.union([z.string().email().max(254), z.literal('')]).default(''),
+  website: optionalWebUrl.default(''),
+  offers: z.string().max(5000).default(''),
+  audience: z.string().max(5000).default(''),
+  brandVoice: z.string().max(5000).default(''),
+  goals: z.array(z.object({ outcome: z.string().max(500), metric: z.string().max(200), target: z.string().max(200), deadline: z.union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/), z.literal('')]).default('') }).strict()).max(10).default([]),
+  channels: z.array(z.object({ platform: z.string().trim().max(80), profileUrl: optionalWebUrl.default(''), channelId: z.string().max(150).default('') }).strict()).max(40).default([]),
+  assetLinks: z.array(optionalWebUrl).max(20).default([]),
+  guardrails: z.array(z.string().max(1000)).max(30).default([]),
+  notes: z.string().max(5000).default(''),
+  reviewPolicy: z.enum(['company_strategy', 'company_posts', 'wood_managed']).default('company_strategy'),
+}).strict();
+export type Brief = z.infer<typeof briefSchema> & { revision: number; updatedAt: string };
+export type Service = {
+  status: 'onboarding' | 'review' | 'active' | 'paused';
+  submittedRevision?: number;
+  companyApproval?: { strategyVersion: number; briefRevision: number; by: string; at: string };
+  team?: string; reviewEveryDays?: number; nextReviewAt?: string;
+  launchedAt?: string; launchedBy?: string;
+};
+export function requireCompanyOrOwner(actor: Actor) {
+  if (actor.role !== 'owner' && actor.role !== 'company') throw new HubError(403, 'Company representative or Wood operator access is required');
+}
 export const strategySchema = z.object({
   title: z.string().min(1).max(200),
   objective: z.string().min(1).max(5000),
@@ -48,6 +80,8 @@ export type Draft = DraftInput & {
   status: 'draft' | 'approved' | 'scheduled' | 'publishing' | 'published' | 'submitted' | 'failed' | 'uncertain' | 'cancelled';
   createdAt: string; updatedAt: string; createdBy: string; approvedBy?: string;
   providerResult?: unknown; error?: string; attempts: number; retryAt?: number;
+  approvedByRole?: Role;
+  approvalBriefRevision?: number;
 };
 export type Channel = { id: string; name: string; provider: string; disabled?: boolean };
 export type Credential = { access_token: string; refresh_token: string; expires_at: number; user: { uuid: string; handle: string; displayName: string; isAiCreator?: boolean } };

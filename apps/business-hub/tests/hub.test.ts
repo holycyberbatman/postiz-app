@@ -82,7 +82,7 @@ beforeAll(async () => {
   }));
   base = (await mf.ready).origin;
   for (const id of ['alpha', 'beta']) {
-    expect((await api('/api/businesses', { id, name: id.toUpperCase(), timezone: 'America/New_York' })).status).toBe(201);
+    expect((await api('/api/businesses', { id, name: id.toUpperCase(), timezone: 'America/New_York', managedService: false })).status).toBe(201);
     expect((await op('connect_postiz', { apiKey: `${id}-postiz-key` }, admin, id)).status).toBe(200);
   }
   for (const role of ['reader', 'editor', 'publisher']) {
@@ -230,5 +230,142 @@ describe.sequential('Business boundaries and content lifecycle', () => {
     await op('revoke_token', { id: issued.body.id });
     expect((await op('get_business', {}, issued.body.token)).status).toBe(401);
     expect((await mf.dispatchFetch(`${base}/mcp/alpha`, { method: 'POST', headers: { Authorization: `Bearer ${issued.body.token}` }, body: '{}' })).status).toBe(401);
+  });
+});
+
+describe.sequential('Wood Enterprises managed service', () => {
+  const business = 'oak-company';
+  let company = '';
+  let publisher = '';
+  let companyGrantId = '';
+  let briefRevision = 0;
+  let strategyVersion = 0;
+  const managed = (operation: string, input: unknown = {}, token = admin) => op(operation, input, token, business);
+  let brief: any = {
+    name: 'Oak Company · test', timezone: 'America/New_York', contactName: 'Test representative', contactEmail: 'representative@example.test',
+    website: 'https://example.test', offers: 'A synthetic service for testing', audience: 'Synthetic customers', brandVoice: 'Clear and practical',
+    goals: [{ outcome: 'Increase qualified enquiries', metric: 'Qualified enquiries per month', target: '20', deadline: '' }],
+    channels: [{ platform: 'LinkedIn', profileUrl: 'https://example.test/company', channelId: '' }],
+    assetLinks: [], guardrails: ['No unsupported claims'], notes: '', reviewPolicy: 'company_strategy',
+  };
+  async function saveAndSubmit() {
+    const saved = await managed('save_onboarding', { revision: briefRevision, brief }, company);
+    expect(saved.status).toBe(200); briefRevision = saved.body.revision;
+    expect((await managed('submit_onboarding', { revision: briefRevision }, company)).status).toBe(200);
+  }
+  test('company access is isolated and cannot grant access, manage agents, or publish', async () => {
+    expect((await api('/api/businesses', { id: business, name: brief.name, timezone: brief.timezone })).status).toBe(201);
+    const access = await managed('issue_company_access', { name: 'Company representative', days: 30 });
+    company = access.body.token; companyGrantId = access.body.id;
+    expect(access.body.role).toBe('company');
+    expect((await api('/api/businesses', undefined, company)).body.map((value: any) => value.id)).toEqual([business]);
+    expect((await op('get_business', {}, company, 'alpha')).status).toBe(403);
+    for (const operation of ['issue_token', 'issue_company_access', 'start_service', 'save_strategy', 'update_business', 'resolve_uncertain', 'get_summary']) expect((await managed(operation, {}, company)).status).toBe(403);
+    expect((await mf.dispatchFetch(`${base}/mcp/${business}`, { method: 'POST', headers: { Authorization: `Bearer ${company}` }, body: '{}' })).status).toBe(403);
+    expect((await managed('issue_token', { name: 'Forged company grant', role: 'company' })).status).toBe(400);
+  });
+  test('onboarding drafts save incrementally, enforce revisions, and reject invalid links', async () => {
+    const saved = await managed('save_onboarding', { revision: 0, brief: { name: brief.name, timezone: brief.timezone } }, company);
+    expect(saved.status).toBe(200); briefRevision = saved.body.revision;
+    expect((await managed('submit_onboarding', { revision: briefRevision }, company)).status).toBe(400);
+    expect((await managed('save_onboarding', { revision: 0, brief }, company)).status).toBe(409);
+    expect((await managed('save_onboarding', { revision: briefRevision, brief: { ...brief, assetLinks: ['javascript:alert(1)'] } }, company)).status).toBe(400);
+    expect((await managed('save_onboarding', { revision: briefRevision, brief: { ...brief, managedService: false } }, company)).status).toBe(400);
+    await saveAndSubmit();
+    const readiness = await managed('get_operating_brief', {}, company);
+    expect(readiness.body.service.status).toBe('review');
+    expect(readiness.body.checks.find((check: any) => check.id === 'channels').ready).toBe(false);
+    expect((await managed('start_service', { team: 'Wood content team' })).status).toBe(409);
+    expect((await api('/api/businesses')).body.find((value: any) => value.id === business).serviceStatus).toBe('review');
+  });
+  test('launch requires connected requested channels, company strategy approval, and publisher access', async () => {
+    expect((await managed('connect_postiz', { apiKey: 'oak-postiz-key' }, company)).status).toBe(200);
+    brief.channels[0].channelId = 'postiz:channel-a';
+    await saveAndSubmit();
+    const saved = await managed('save_strategy', strategy); strategyVersion = saved.body.version;
+    await managed('activate_strategy', { version: strategyVersion });
+    expect((await managed('approve_strategy', { version: strategyVersion, briefRevision })).status).toBe(403);
+    expect((await managed('approve_strategy', { version: strategyVersion, briefRevision }, company)).status).toBe(200);
+    expect((await managed('start_service', { team: 'Wood content team' })).status).toBe(409);
+    const access = await managed('issue_token', { name: 'Wood publisher team', role: 'publisher' }); publisher = access.body.token;
+    const input = draft('managed-before-launch');
+    const created = await managed('create_draft', input, publisher);
+    expect((await managed('schedule_draft', { id: created.body.id, revision: 1 }, publisher)).status).not.toBe(200);
+    expect((await managed('get_operating_brief', {}, publisher)).body.ready).toBe(true);
+    expect((await managed('start_service', { team: 'Wood content team', reviewEveryDays: 7 })).body.status).toBe('active');
+    expect((await managed('get_business', {}, company)).body.business.publishingMode).toBe('automatic');
+    const post = await managed('create_draft', draft('managed-live-test', { content: 'managed mock publication', scheduledAt: new Date(Date.now() + 1200).toISOString() }), publisher);
+    expect((await managed('schedule_draft', { id: post.body.id, revision: 1 }, publisher)).status).toBe(200);
+    await expect.poll(async () => (await managed('get_draft', { id: post.body.id })).body.status, { timeout: 10000 }).toBe('submitted');
+    expect(externalPosts['managed mock publication']).toBe(1);
+  });
+  test('saving an unchanged brief preserves the active service and company approval', async () => {
+    const before = (await managed('get_operating_brief')).body;
+    const saved = await managed('save_onboarding', { revision: briefRevision, brief }, company);
+    expect(saved.status).toBe(200);
+    expect(saved.body.revision).toBe(briefRevision);
+    const after = (await managed('get_operating_brief')).body;
+    expect(after.service).toEqual(before.service);
+    expect(after.service.status).toBe('active');
+    expect(after.ready).toBe(true);
+  });
+  test('a company pause holds a queued post before any provider write', async () => {
+    const post = await managed('create_draft', draft('managed-paused-test', { content: 'held by company pause', scheduledAt: new Date(Date.now() + 1200).toISOString() }), publisher);
+    expect((await managed('schedule_draft', { id: post.body.id, revision: 1 }, publisher)).status).toBe(200);
+    expect((await managed('pause_service', {}, company)).body.status).toBe('paused');
+    await expect.poll(async () => (await managed('get_draft', { id: post.body.id })).body.status, { timeout: 10000 }).toBe('failed');
+    expect(externalPosts['held by company pause']).toBeUndefined();
+    expect((await api('/api/businesses')).body.find((value: any) => value.id === business).serviceStatus).toBe('paused');
+    expect((await managed('start_service', { team: 'Wood content team' })).status).toBe(200);
+  });
+  test('MCP strategy revisions hold the service and update the Wood portfolio', async () => {
+    const client = new Client({ name: 'wood-agent-test', version: '1.0.0' });
+    await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp/${business}`), { requestInit: { headers: { Authorization: `Bearer ${publisher}` } } }));
+    try {
+      const tools = await client.listTools();
+      expect(tools.tools.some(tool => tool.name === 'get_operating_brief')).toBe(true);
+      expect(tools.tools.some(tool => tool.name === 'start_service' || tool.name === 'approve_strategy')).toBe(false);
+      expect((await client.callTool({ name: 'save_strategy', arguments: { ...strategy, title: 'Refined strategy' } })).isError).toBe(false);
+    } finally { await client.close(); }
+    strategyVersion = (await managed('get_business')).body.strategy.version;
+    expect((await api('/api/businesses')).body.find((value: any) => value.id === business).serviceStatus).toBe('review');
+    await managed('activate_strategy', { version: strategyVersion });
+    expect((await managed('start_service', { team: 'Wood team' })).status).toBe(409);
+    expect((await managed('approve_strategy', { version: strategyVersion - 1, briefRevision }, company)).status).toBe(409);
+    expect((await managed('approve_strategy', { version: strategyVersion, briefRevision }, company)).status).toBe(200);
+  });
+  test('per-post company approval cannot be substituted by Wood or reused after a brief change', async () => {
+    brief.reviewPolicy = 'company_posts'; await saveAndSubmit();
+    await managed('approve_strategy', { version: strategyVersion, briefRevision }, company);
+    expect((await managed('start_service', { team: 'Wood team' })).status).toBe(200);
+    const post = await managed('create_draft', draft('managed-company-review'), publisher);
+    expect((await managed('approve_draft', { id: post.body.id, revision: 1 })).status).toBe(403);
+    expect((await managed('approve_draft', { id: post.body.id, revision: 1 }, company)).status).toBe(200);
+    brief.notes = 'Updated operating mandate'; await saveAndSubmit();
+    expect((await managed('schedule_draft', { id: post.body.id, revision: 1 }, publisher)).status).toBe(409);
+    await managed('approve_strategy', { version: strategyVersion, briefRevision }, company);
+    await managed('start_service', { team: 'Wood team' });
+    expect((await managed('schedule_draft', { id: post.body.id, revision: 1 }, publisher)).status).toBe(403);
+    expect((await managed('approve_draft', { id: post.body.id, revision: 1 }, company)).status).toBe(200);
+    expect((await managed('schedule_draft', { id: post.body.id, revision: 1 }, publisher)).status).toBe(200);
+    await managed('cancel_draft', { id: post.body.id });
+  });
+  test('a completed performance review advances the next review date', async () => {
+    const result = await managed('record_review', { periodStart: '2026-09-01T00:00:00Z', periodEnd: '2026-09-07T00:00:00Z', findings: 'Synthetic review; no live commercial measurements.', nextActions: ['Validate the first real platform post'], metrics: {} }, publisher);
+    expect(result.status).toBe(200);
+    const current = (await managed('get_operating_brief')).body;
+    expect(Date.parse(current.service.nextReviewAt)).toBeGreaterThan(Date.now());
+    expect((await api('/api/businesses')).body.find((value: any) => value.id === business).nextReviewAt).toBe(current.service.nextReviewAt);
+  });
+  test('revoking company access during OAuth prevents the connection from being saved', async () => {
+    const start = await managed('connect_fanvue', {}, company);
+    expect(start.status).toBe(200);
+    const authorize = new URL(start.body.url);
+    const cookie = start.headers.get('Set-Cookie')!.split(';')[0];
+    await managed('revoke_token', { id: companyGrantId });
+    const response = await mf.dispatchFetch(`https://hub.test/oauth/fanvue/callback?state=${authorize.searchParams.get('state')}&code=company-code`, { headers: { Cookie: cookie }, redirect: 'manual' });
+    expect(response.status).toBe(401);
+    expect((await managed('get_business')).body.connections.fanvue).toBeNull();
+    expect((await managed('save_onboarding', { revision: briefRevision, brief }, company)).status).toBe(401);
   });
 });

@@ -24,9 +24,11 @@ pnpm exec wrangler deploy --var PUBLIC_ORIGIN:https://YOUR-HUB.example.com
 
 For a persistent production origin, add it under `vars` in `wrangler.jsonc`. Never place OAuth secrets, provider API keys, the encryption key, or the owner token in that file.
 
-Health: `GET /health` returns `ready` after owner/encryption secrets exist. This is hub readiness; it does not mean that providers are connected. The dashboard’s Connections screen shows missing provider configuration. Without a bearer token or owner session, `/api/businesses` and `/mcp/{business}` return 401.
+Health: `GET /health` returns `ready` after owner/encryption secrets exist. This is hub readiness; it does not mean that providers are connected or company operations have launched. The dashboard’s Channels screen shows missing provider configuration. Without a bearer token or authenticated session, `/api/businesses` and `/mcp/{business}` return 401.
 
 Cloudflare creates the directory and per-business SQLite Durable Object namespaces through the `v1` migration. Preserve those bindings and migration history on upgrades. Never rename the Worker or recreate namespaces as a routine deployment. Durable Object records and alarms survive Worker releases. Use Cloudflare’s storage recovery facilities and securely retained encryption keys for recovery; an automated export/restore workflow is not included in this release.
+
+Version 0.2 adds managed-service records within the existing Durable Objects; no new namespace or migration is needed. New companies default to managed onboarding. Existing businesses without `managedService` keep the legacy approval workflow and are not automatically enrolled. Company access is distinct from agent access and cannot use MCP.
 
 ## Read-only release check
 
@@ -47,7 +49,7 @@ pnpm exec wrangler secret put FANVUE_CLIENT_ID
 pnpm exec wrangler secret put FANVUE_CLIENT_SECRET
 ```
 
-Requested scopes: `openid offline_access offline read:self read:post write:post read:media write:media`. The implementation uses authorization code + S256 PKCE, HTTP Basic client authentication, a browser-bound single-use state, and refresh token rotation. The pinned API version is `2025-06-26`; the API base is `https://api.fanvue.com/v1`. Authorize the intended creator from that business’s Connections tab. Fanvue must return a creator account.
+Requested scopes: `openid offline_access offline read:self read:post write:post read:media write:media`. The implementation uses authorization code + S256 PKCE, HTTP Basic client authentication, a browser-bound single-use state, and refresh token rotation. The pinned API version is `2025-06-26`; the API base is `https://api.fanvue.com/v1`. Authorize the intended creator from that company’s Channels tab using Wood or company access. Fanvue must return a creator account. Revoked or expired company access cannot finish an OAuth connection started earlier.
 
 Each business has one Fanvue creator connection. Keep a creator assigned to one business when distinct tenant isolation is required; connecting the same account to multiple businesses would intentionally share access to that account’s content. Revoke access through Disconnect Fanvue or in Fanvue itself. Changing to a different creator requires disconnecting first.
 
@@ -68,12 +70,12 @@ A host-ready compose recipe is in `deploy/postiz.compose.yaml`, adapted from the
 5. Place HTTPS ingress or a Cloudflare Tunnel in front of `127.0.0.1:4007`. Keep the Postiz public API reachable from the hub Worker; an interactive Cloudflare Access login on that API would prevent machine access.
 6. For first-owner bootstrap only, temporarily set `DISABLE_REGISTRATION=false` and restrict ingress to the operator. Create the owner, then set it back to `true`, restart Postiz, and open normal ingress.
 7. Create a separate Postiz organization per business, connect its social accounts, and obtain that organization’s API key.
-8. Set `POSTIZ_ORIGIN` in hub `wrangler.jsonc` to the HTTPS origin (no path, credentials, or query), deploy the hub, then paste each organization’s key into the matching business’s Connections screen.
+8. Set `POSTIZ_ORIGIN` in hub `wrangler.jsonc` to the HTTPS origin (no path, credentials, or query), deploy the hub, then paste each organization’s key into the matching company’s Channels screen.
 
 Pin and upgrade image versions deliberately. The provided image variable refers to a published upstream Postiz release because this fork’s existing Postiz engine is unchanged; the hub is deployed separately from its own source. If you later modify the original engine, build and deploy an image containing those fork changes.
 
 ## First live verification
 
-Create the actual business, connect its accounts, write and activate its strategy, and issue an editor token. Verify that the token cannot read another business or activate a strategy. Create one agreed test draft for the intended channel, inspect media/settings and destination, approve it, then schedule it. Verify the final platform post and record the provider ID. No real test post was created by the automated test suite.
+Follow [company onboarding and Wood launch](AGENT_GUIDE.md#company-onboarding-and-wood-launch): submit the actual brief, connect and map all requested accounts, activate the strategy, collect required company approval, issue scoped team access, and launch. Verify a company token cannot access another company, issue agent access, launch, or connect to MCP; verify an editor cannot activate a strategy or schedule content. Create one agreed test draft for the intended channel, inspect media/settings and destination, obtain any required company approval, then schedule it through publisher access. Verify the final platform post and record the provider ID. No real test post was created by the automated test suite.
 
-After successful live validation, decide whether the business should remain approval-only or allow a publisher team to schedule content against its active strategy. Agent execution schedules belong in the chosen agent runtime. Deployment alone does not start them.
+After successful live validation, configure the company’s content and review run schedules in the chosen agent runtime. The Service page records the assigned Wood team and next review date, but does not run a model or schedule the team. Deployment and service launch alone do not start agent jobs.
