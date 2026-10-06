@@ -1,0 +1,120 @@
+# Persistent-host recipe adapted from the upstream docker-compose.yaml.
+# Validate with docker compose config on the selected host before launch.
+name: postiz-engine
+services:
+  postiz:
+    image: ${POSTIZ_IMAGE:?Set an explicit released Postiz image tag or digest}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      MAIN_URL: ${POSTIZ_PUBLIC_ORIGIN:?Set the public HTTPS origin}
+      FRONTEND_URL: ${POSTIZ_PUBLIC_ORIGIN}
+      NEXT_PUBLIC_BACKEND_URL: ${POSTIZ_PUBLIC_ORIGIN}/api
+      JWT_SECRET: ${POSTIZ_JWT_SECRET:?Set a unique random secret}
+      DATABASE_URL: postgresql://postiz:${POSTIZ_DB_PASSWORD:?Set a random alphanumeric password}@postgres:5432/postiz
+      REDIS_URL: redis://redis:6379
+      BACKEND_INTERNAL_URL: http://localhost:3000
+      TEMPORAL_ADDRESS: temporal:7233
+      IS_GENERAL: 'true'
+      DISABLE_REGISTRATION: ${DISABLE_REGISTRATION:-true}
+      STORAGE_PROVIDER: local
+      UPLOAD_DIRECTORY: /uploads
+      NEXT_PUBLIC_UPLOAD_DIRECTORY: /uploads
+      NX_ADD_PLUGINS: 'false'
+    volumes:
+      - postiz-config:/config
+      - postiz-uploads:/uploads
+    ports:
+      - '127.0.0.1:4007:5000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postiz
+      POSTGRES_DB: postiz
+      POSTGRES_PASSWORD: ${POSTIZ_DB_PASSWORD}
+    volumes:
+      - postiz-database:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postiz -d postiz']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7.2
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - postiz-redis:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  temporal-postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: ${TEMPORAL_DB_PASSWORD:?Set a distinct random password}
+    volumes:
+      - temporal-database:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U temporal']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  temporal-elasticsearch:
+    image: elasticsearch:7.17.27
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      ES_JAVA_OPTS: -Xms256m -Xmx256m
+      xpack.security.enabled: 'false'
+      cluster.routing.allocation.disk.threshold_enabled: 'true'
+      cluster.routing.allocation.disk.watermark.low: 512mb
+      cluster.routing.allocation.disk.watermark.high: 256mb
+      cluster.routing.allocation.disk.watermark.flood_stage: 128mb
+    volumes:
+      - temporal-search:/usr/share/elasticsearch/data
+
+  temporal:
+    image: temporalio/auto-setup:1.28.1
+    restart: unless-stopped
+    depends_on:
+      temporal-postgres:
+        condition: service_healthy
+      temporal-elasticsearch:
+        condition: service_started
+    environment:
+      DB: postgres12
+      DB_PORT: '5432'
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: ${TEMPORAL_DB_PASSWORD}
+      POSTGRES_SEEDS: temporal-postgres
+      DYNAMIC_CONFIG_FILE_PATH: config/dynamicconfig/production.yaml
+      ENABLE_ES: 'true'
+      ES_SEEDS: temporal-elasticsearch
+      ES_VERSION: v7
+      TEMPORAL_NAMESPACE: default
+    volumes:
+      - ./temporal.dynamic.yaml:/etc/temporal/config/dynamicconfig/production.yaml:ro
+
+volumes:
+  postiz-config:
+  postiz-uploads:
+  postiz-database:
+  postiz-redis:
+  temporal-database:
+  temporal-search:

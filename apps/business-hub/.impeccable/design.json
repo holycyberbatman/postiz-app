@@ -1,0 +1,431 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-06T16:07:25.546288+00:00",
+  "title": "Design System: Wood Enterprises Content Service",
+  "extensions": {
+    "colorMeta": {
+      "accent": {
+        "role": "primary",
+        "displayName": "Postiz Purple",
+        "tonalRamp": [
+          "oklch(15.00% 0.23274 288.71)",
+          "oklch(26.43% 0.23274 288.71)",
+          "oklch(37.86% 0.23274 288.71)",
+          "oklch(49.29% 0.23274 288.71)",
+          "oklch(60.71% 0.23274 288.71)",
+          "oklch(72.14% 0.23274 288.71)",
+          "oklch(83.57% 0.23274 288.71)",
+          "oklch(95.00% 0.23274 288.71)"
+        ]
+      },
+      "accent-dark": {
+        "role": "primary",
+        "displayName": "Deep Purple",
+        "tonalRamp": [
+          "oklch(15.00% 0.19255 289.58)",
+          "oklch(26.43% 0.19255 289.58)",
+          "oklch(37.86% 0.19255 289.58)",
+          "oklch(49.29% 0.19255 289.58)",
+          "oklch(60.71% 0.19255 289.58)",
+          "oklch(72.14% 0.19255 289.58)",
+          "oklch(83.57% 0.19255 289.58)",
+          "oklch(95.00% 0.19255 289.58)"
+        ]
+      },
+      "soft": {
+        "role": "primary",
+        "displayName": "Soft Lavender",
+        "tonalRamp": [
+          "oklch(15.00% 0.03100 291.78)",
+          "oklch(26.43% 0.03100 291.78)",
+          "oklch(37.86% 0.03100 291.78)",
+          "oklch(49.29% 0.03100 291.78)",
+          "oklch(60.71% 0.03100 291.78)",
+          "oklch(72.14% 0.03100 291.78)",
+          "oklch(83.57% 0.03100 291.78)",
+          "oklch(95.00% 0.03100 291.78)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "tonalRamp": [
+          "oklch(15.00% 0.01688 290.23)",
+          "oklch(26.43% 0.01688 290.23)",
+          "oklch(37.86% 0.01688 290.23)",
+          "oklch(49.29% 0.01688 290.23)",
+          "oklch(60.71% 0.01688 290.23)",
+          "oklch(72.14% 0.01688 290.23)",
+          "oklch(83.57% 0.01688 290.23)",
+          "oklch(95.00% 0.01688 290.23)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Slate",
+        "tonalRamp": [
+          "oklch(15.00% 0.01775 273.61)",
+          "oklch(26.43% 0.01775 273.61)",
+          "oklch(37.86% 0.01775 273.61)",
+          "oklch(49.29% 0.01775 273.61)",
+          "oklch(60.71% 0.01775 273.61)",
+          "oklch(72.14% 0.01775 273.61)",
+          "oklch(83.57% 0.01775 273.61)",
+          "oklch(95.00% 0.01775 273.61)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Soft Divider",
+        "tonalRamp": [
+          "oklch(15.00% 0.00876 264.52)",
+          "oklch(26.43% 0.00876 264.52)",
+          "oklch(37.86% 0.00876 264.52)",
+          "oklch(49.29% 0.00876 264.52)",
+          "oklch(60.71% 0.00876 264.52)",
+          "oklch(72.14% 0.00876 264.52)",
+          "oklch(83.57% 0.00876 264.52)",
+          "oklch(95.00% 0.00876 264.52)"
+        ]
+      },
+      "ground": {
+        "role": "neutral",
+        "displayName": "Cool Ground",
+        "tonalRamp": [
+          "oklch(15.00% 0.00343 247.86)",
+          "oklch(26.43% 0.00343 247.86)",
+          "oklch(37.86% 0.00343 247.86)",
+          "oklch(49.29% 0.00343 247.86)",
+          "oklch(60.71% 0.00343 247.86)",
+          "oklch(72.14% 0.00343 247.86)",
+          "oklch(83.57% 0.00343 247.86)",
+          "oklch(95.00% 0.00343 247.86)"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "White Paper",
+        "tonalRamp": [
+          "oklch(15.00% 0.00000 0.00)",
+          "oklch(26.43% 0.00000 0.00)",
+          "oklch(37.86% 0.00000 0.00)",
+          "oklch(49.29% 0.00000 0.00)",
+          "oklch(60.71% 0.00000 0.00)",
+          "oklch(72.14% 0.00000 0.00)",
+          "oklch(83.57% 0.00000 0.00)",
+          "oklch(95.00% 0.00000 0.00)"
+        ]
+      },
+      "field-line": {
+        "role": "neutral",
+        "displayName": "Field Stroke",
+        "tonalRamp": [
+          "oklch(15.00% 0.01646 266.25)",
+          "oklch(26.43% 0.01646 266.25)",
+          "oklch(37.86% 0.01646 266.25)",
+          "oklch(49.29% 0.01646 266.25)",
+          "oklch(60.71% 0.01646 266.25)",
+          "oklch(72.14% 0.01646 266.25)",
+          "oklch(83.57% 0.01646 266.25)",
+          "oklch(95.00% 0.01646 266.25)"
+        ]
+      },
+      "focus": {
+        "role": "primary",
+        "displayName": "Focus Purple",
+        "tonalRamp": [
+          "oklch(15.00% 0.17740 295.06)",
+          "oklch(26.43% 0.17740 295.06)",
+          "oklch(37.86% 0.17740 295.06)",
+          "oklch(49.29% 0.17740 295.06)",
+          "oklch(60.71% 0.17740 295.06)",
+          "oklch(72.14% 0.17740 295.06)",
+          "oklch(83.57% 0.17740 295.06)",
+          "oklch(95.00% 0.17740 295.06)"
+        ]
+      },
+      "status-ink": {
+        "role": "secondary",
+        "displayName": "Quiet Status Lavender",
+        "tonalRamp": [
+          "oklch(15.00% 0.05889 296.81)",
+          "oklch(26.43% 0.05889 296.81)",
+          "oklch(37.86% 0.05889 296.81)",
+          "oklch(49.29% 0.05889 296.81)",
+          "oklch(60.71% 0.05889 296.81)",
+          "oklch(72.14% 0.05889 296.81)",
+          "oklch(83.57% 0.05889 296.81)",
+          "oklch(95.00% 0.05889 296.81)"
+        ]
+      },
+      "status-ground": {
+        "role": "secondary",
+        "displayName": "Quiet Status Ground",
+        "tonalRamp": [
+          "oklch(15.00% 0.02199 300.20)",
+          "oklch(26.43% 0.02199 300.20)",
+          "oklch(37.86% 0.02199 300.20)",
+          "oklch(49.29% 0.02199 300.20)",
+          "oklch(60.71% 0.02199 300.20)",
+          "oklch(72.14% 0.02199 300.20)",
+          "oklch(83.57% 0.02199 300.20)",
+          "oklch(95.00% 0.02199 300.20)"
+        ]
+      },
+      "success": {
+        "role": "secondary",
+        "displayName": "Confirmed Green",
+        "tonalRamp": [
+          "oklch(15.00% 0.08737 157.53)",
+          "oklch(26.43% 0.08737 157.53)",
+          "oklch(37.86% 0.08737 157.53)",
+          "oklch(49.29% 0.08737 157.53)",
+          "oklch(60.71% 0.08737 157.53)",
+          "oklch(72.14% 0.08737 157.53)",
+          "oklch(83.57% 0.08737 157.53)",
+          "oklch(95.00% 0.08737 157.53)"
+        ]
+      },
+      "success-ground": {
+        "role": "secondary",
+        "displayName": "Confirmed Ground",
+        "tonalRamp": [
+          "oklch(15.00% 0.01987 154.90)",
+          "oklch(26.43% 0.01987 154.90)",
+          "oklch(37.86% 0.01987 154.90)",
+          "oklch(49.29% 0.01987 154.90)",
+          "oklch(60.71% 0.01987 154.90)",
+          "oklch(72.14% 0.01987 154.90)",
+          "oklch(83.57% 0.01987 154.90)",
+          "oklch(95.00% 0.01987 154.90)"
+        ]
+      },
+      "danger": {
+        "role": "secondary",
+        "displayName": "Attention Red",
+        "tonalRamp": [
+          "oklch(15.00% 0.15767 21.79)",
+          "oklch(26.43% 0.15767 21.79)",
+          "oklch(37.86% 0.15767 21.79)",
+          "oklch(49.29% 0.15767 21.79)",
+          "oklch(60.71% 0.15767 21.79)",
+          "oklch(72.14% 0.15767 21.79)",
+          "oklch(83.57% 0.15767 21.79)",
+          "oklch(95.00% 0.15767 21.79)"
+        ]
+      },
+      "danger-ground": {
+        "role": "secondary",
+        "displayName": "Attention Ground",
+        "tonalRamp": [
+          "oklch(15.00% 0.01886 5.30)",
+          "oklch(26.43% 0.01886 5.30)",
+          "oklch(37.86% 0.01886 5.30)",
+          "oklch(49.29% 0.01886 5.30)",
+          "oklch(60.71% 0.01886 5.30)",
+          "oklch(72.14% 0.01886 5.30)",
+          "oklch(83.57% 0.01886 5.30)",
+          "oklch(95.00% 0.01886 5.30)"
+        ]
+      },
+      "pending": {
+        "role": "secondary",
+        "displayName": "In-flight Blue",
+        "tonalRamp": [
+          "oklch(15.00% 0.11291 255.36)",
+          "oklch(26.43% 0.11291 255.36)",
+          "oklch(37.86% 0.11291 255.36)",
+          "oklch(49.29% 0.11291 255.36)",
+          "oklch(60.71% 0.11291 255.36)",
+          "oklch(72.14% 0.11291 255.36)",
+          "oklch(83.57% 0.11291 255.36)",
+          "oklch(95.00% 0.11291 255.36)"
+        ]
+      },
+      "pending-ground": {
+        "role": "secondary",
+        "displayName": "In-flight Ground",
+        "tonalRamp": [
+          "oklch(15.00% 0.01712 256.28)",
+          "oklch(26.43% 0.01712 256.28)",
+          "oklch(37.86% 0.01712 256.28)",
+          "oklch(49.29% 0.01712 256.28)",
+          "oklch(60.71% 0.01712 256.28)",
+          "oklch(72.14% 0.01712 256.28)",
+          "oklch(83.57% 0.01712 256.28)",
+          "oklch(95.00% 0.01712 256.28)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Page and business names."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Main working-section headings."
+      },
+      "section-title": {
+        "displayName": "Section Title",
+        "purpose": "Content titles and supporting subsections."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Reading copy and ordinary controls."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Separate semibold field labels."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Supporting information and helpers."
+      },
+      "status": {
+        "displayName": "Status",
+        "purpose": "Compact semibold state labels."
+      }
+    },
+    "shadows": [],
+    "motion": [
+      {
+        "name": "workspace-arrival-duration",
+        "value": ".18s",
+        "purpose": "Duration of the workspace entry animation; disabled for reduced motion."
+      },
+      {
+        "name": "workspace-arrival-easing",
+        "value": "ease-out",
+        "purpose": "Easing for the single workspace arrival animation."
+      },
+      {
+        "name": "workspace-arrival-offset",
+        "value": "translateY(3px)",
+        "purpose": "Initial position before arriving at translateY(0)."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "phone",
+        "value": "760px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The principal create, save, activate, schedule, or reviewed-reply action.",
+      "html": "<button class=\"ds-button-primary\">Save draft</button>",
+      "css": ".ds-button-primary{display:inline-flex;align-items:center;justify-content:center;gap:8px;font:600 15px/1.55 -apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;border:1px solid transparent;border-radius:8px;min-height:42px;padding:9px 17px;text-decoration:none;white-space:nowrap;cursor:pointer;background:var(--accent,#612bd3);color:var(--paper,#fff)}.ds-button-primary:hover{background:var(--accent-dark,#48199f)}.ds-button-primary:focus-visible{outline:3px solid var(--focus,#8c66df);outline-offset:3px;}.ds-button-primary:disabled{cursor:not-allowed;opacity:.5}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "A supporting action with a white surface and a neutral border.",
+      "html": "<button class=\"ds-button-secondary\">Business settings</button>",
+      "css": ".ds-button-secondary{display:inline-flex;align-items:center;justify-content:center;gap:8px;font:600 15px/1.55 -apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;border:1px solid transparent;border-radius:8px;min-height:42px;padding:9px 17px;text-decoration:none;white-space:nowrap;cursor:pointer;background:var(--paper,#fff);border-color:var(--line,#dfe2e8);color:var(--ink,#22212a)}.ds-button-secondary:hover{border-color:#a59bb8;background:#f7f5fc}.ds-button-secondary:focus-visible{outline:3px solid var(--focus,#8c66df);outline-offset:3px;}.ds-button-secondary:disabled{cursor:not-allowed;opacity:.5}"
+    },
+    {
+      "name": "Labeled Field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "A separate semibold label above an editable white field.",
+      "html": "<div class=\"ds-field\"><label class=\"ds-field-label\" for=\"ds-business-name\">Business name</label><input class=\"ds-field-input\" id=\"ds-business-name\" name=\"business-name\" type=\"text\"></div>",
+      "css": ".ds-field{display:flex;flex-direction:column;gap:7px;margin-bottom:20px;min-width:0;color:var(--ink,#22212a);font:15px/1.55 -apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif}.ds-field-label{font-size:13px;font-weight:600}.ds-field-input{width:100%;border:1px solid var(--field-line,#b8bdc8);background:var(--paper,#fff);color:var(--ink,#22212a);border-radius:7px;padding:10px 12px;min-height:43px;font:15px/1.55 -apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif}.ds-field-input::placeholder{color:#72747e}.ds-field-input:focus-visible{outline:3px solid var(--focus,#8c66df);outline-offset:3px;}"
+    },
+    {
+      "name": "Workspace Navigation",
+      "kind": "nav",
+      "refersTo": "workspace-tab",
+      "description": "Text navigation with a purple lower stroke for the current location.",
+      "html": "<nav class=\"ds-tabs\" aria-label=\"Business workspace\"><button class=\"ds-tab\">Content</button><button class=\"ds-tab\" aria-current=\"page\">Inbox</button><button class=\"ds-tab\">Strategy</button><button class=\"ds-tab\">Channels</button><button class=\"ds-tab\">Agent access</button><button class=\"ds-tab\">Activity</button></nav>",
+      "css": ".ds-tabs{display:flex;gap:28px;border-bottom:1px solid var(--line,#dfe2e8);margin-bottom:30px;overflow-x:auto}.ds-tab{border-radius:0;background:none;border:0;border-bottom:3px solid transparent;padding:12px 0;color:var(--muted,#626570);font:600 15px/1.55 -apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;white-space:nowrap;cursor:pointer}.ds-tab[aria-current=\"page\"]{color:var(--accent,#612bd3);border-bottom-color:var(--accent,#612bd3)}.ds-tab:focus-visible{outline:3px solid var(--focus,#8c66df);outline-offset:3px;}@media(max-width:760px){.ds-tabs{gap:24px;margin-bottom:24px}}"
+    },
+    {
+      "name": "Status Badges",
+      "kind": "chip",
+      "refersTo": "status-badge",
+      "description": "Informational state labels; wording retains distinctions within each color family.",
+      "html": "<span class=\"ds-badge\">draft</span> <span class=\"ds-badge ds-badge-pending\">submitted</span> <span class=\"ds-badge ds-badge-success\">published</span> <span class=\"ds-badge ds-badge-success\">sent</span> <span class=\"ds-badge ds-badge-danger\">uncertain</span>",
+      "css": ".ds-badge{display:inline-block;border-radius:5px;padding:3px 8px;font:600 12px/1.5 -apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;color:var(--status-ink,#4c4265);background:var(--status-ground,#eee9f9);white-space:nowrap}.ds-badge-success{color:var(--success,#246644);background:var(--success-ground,#e5f3e9)}.ds-badge-danger{color:var(--danger,#a32932);background:var(--danger-ground,#fbeaed)}.ds-badge-pending{color:var(--pending,#275895);background:var(--pending-ground,#e8f0fb)}"
+    },
+    {
+      "name": "Work Panel",
+      "kind": "card",
+      "refersTo": "work-panel",
+      "description": "The flat bordered surface shared by reading panels and editing forms.",
+      "html": "<article class=\"ds-work-panel\"><h3 class=\"ds-work-panel-title\">Content pillars</h3><p class=\"ds-work-panel-copy\">The shared direction for this business and its agent team.</p></article>",
+      "css": ".ds-work-panel{background:var(--paper,#fff);border:1px solid var(--line,#dfe2e8);border-radius:12px;padding:28px;color:var(--ink,#22212a);font:15px/1.55 -apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif}.ds-work-panel-title{font-size:17px;font-weight:650;margin:0 0 10px}.ds-work-panel-copy{margin:0;max-width:72ch;white-space:pre-wrap}@media(max-width:760px){.ds-work-panel{padding:22px}}"
+    },
+    {
+      "name": "Business Identity Row",
+      "kind": "custom",
+      "description": "Recognizable business identity beside a separate workspace opening action.",
+      "html": "<div class=\"ds-table-wrap\"><table class=\"ds-business-table\"><thead><tr><th>Business</th><th class=\"ds-align-right\">Content operations</th></tr></thead><tbody><tr><td><div class=\"ds-business-cell\"><span class=\"ds-initials\" aria-hidden=\"true\">BN</span><div><button class=\"ds-name-button\">Business name</button><small class=\"ds-business-subtitle\">Business workspace</small></div></div></td><td class=\"ds-align-right\"><button class=\"ds-open-workspace\">Open workspace →</button></td></tr></tbody></table></div>",
+      "css": ".ds-table-wrap{overflow-x:auto;background:var(--paper,#fff);border:1px solid var(--line,#dfe2e8);border-radius:12px;color:var(--ink,#22212a);font:15px/1.55 -apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif}.ds-business-table{border-collapse:collapse;width:100%;text-align:left}.ds-business-table th{background:#f7f8fa;color:var(--muted,#626570);font-size:12px;font-weight:600;padding:14px 20px;border-bottom:1px solid var(--line,#dfe2e8);white-space:nowrap}.ds-business-table td{padding:20px;vertical-align:middle}.ds-business-cell{display:flex;align-items:center;gap:14px}.ds-initials{width:42px;height:42px;display:grid;place-items:center;flex-shrink:0;border-radius:10px;background:var(--soft,#ebe8ff);color:#491ca4;font-size:15px;font-weight:650}.ds-name-button{border:0;padding:0;background:none;color:var(--ink,#22212a);font:650 16px/1.55 -apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;text-align:left;cursor:pointer}.ds-name-button:hover{color:var(--accent,#612bd3)}.ds-name-button:focus-visible{outline:3px solid var(--focus,#8c66df);outline-offset:3px;}.ds-business-subtitle{display:block;margin-top:3px;color:var(--muted,#626570);font-size:13px}.ds-align-right{text-align:right}.ds-open-workspace{display:inline-flex;align-items:center;justify-content:center;gap:8px;font:600 15px/1.55 -apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;border:1px solid transparent;border-radius:8px;min-height:42px;padding:9px 17px;text-decoration:none;white-space:nowrap;cursor:pointer;background:var(--paper,#fff);border-color:var(--line,#dfe2e8);color:var(--ink,#22212a)}.ds-open-workspace:hover{border-color:#a59bb8;background:#f7f5fc}.ds-open-workspace:focus-visible{outline:3px solid var(--focus,#8c66df);outline-offset:3px;}@media(max-width:760px){.ds-business-table th,.ds-business-table td{padding:15px}}"
+    },
+    {
+      "name": "Conversation Selection Rows",
+      "kind": "custom",
+      "refersTo": "conversation-row",
+      "description": "Selectable divided rows with a complete name, two-line preview, and a lavender current state.",
+      "html": "<aside class=\"ds-conversation-list\" aria-label=\"Conversations\"><button class=\"ds-conversation-row\" aria-current=\"true\"><span class=\"ds-conversation-name\">Current conversation</span><span class=\"ds-conversation-preview\">The conversation preview is limited to two lines. Complete messages are available in the reading pane.</span><small class=\"ds-conversation-meta\">Message time · open</small></button><button class=\"ds-conversation-row\"><span class=\"ds-conversation-name\">Another conversation</span><span class=\"ds-conversation-preview\">No text preview</span><small class=\"ds-conversation-meta\">Message time · Human control</small></button></aside>",
+      "css": ".ds-conversation-list{border-right:1px solid var(--line,#dfe2e8);min-width:0}.ds-conversation-row{display:block;width:100%;text-align:left;padding:20px;background:var(--paper,#fff);color:var(--ink,#22212a);border:0;border-bottom:1px solid var(--line,#dfe2e8);border-radius:0;white-space:normal;font:15px/1.55 -apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;cursor:pointer}.ds-conversation-row:hover,.ds-conversation-row[aria-current]{background:var(--soft,#ebe8ff)}.ds-conversation-row:focus-visible{outline:3px solid var(--focus,#8c66df);outline-offset:3px}.ds-conversation-row:disabled{cursor:not-allowed;opacity:.5}.ds-conversation-name{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-weight:650}.ds-conversation-preview{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;margin:8px 0;overflow-wrap:anywhere}.ds-conversation-meta{display:block;font-size:13px;color:var(--muted,#626570)}@media(max-width:760px){.ds-conversation-list{border-right:0;border-bottom:1px solid var(--line,#dfe2e8)}.ds-conversation-row{padding:18px}}"
+    },
+    {
+      "name": "Message and Reply Rows",
+      "kind": "custom",
+      "refersTo": "conversation-entry",
+      "description": "Shared divided history and review rows, with metadata above complete wrapping text and reply actions below.",
+      "html": "<div class=\"ds-conversation-reading\"><div class=\"ds-message-history\"><article class=\"ds-message-row\"><div class=\"ds-message-meta\"><strong>Conversation participant</strong><span>Message time</span></div><p class=\"ds-message-body\">Message text preserves line breaks.\nAdditional detail remains visible here.</p><small class=\"ds-message-status\">Message status</small></article></div><div class=\"ds-reply-history\"><h3 class=\"ds-reply-heading\">Replies and delivery</h3><article class=\"ds-reply-row\"><div class=\"ds-message-meta\"><span class=\"ds-reply-badge ds-reply-approved\">approved</span><small class=\"ds-reply-revision\">Revision 1 · Update time</small></div><p class=\"ds-message-body\">The exact reply text appears here for review.</p><div class=\"ds-reply-actions\"><button class=\"ds-reply-approve\">Send reviewed reply</button></div></article></div></div>",
+      "css": ".ds-conversation-reading{color:var(--ink,#22212a);font:15px/1.55 -apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif}.ds-message-history{margin-top:28px;border-top:1px solid var(--line,#dfe2e8)}.ds-message-row,.ds-reply-row{padding:20px 0;border-bottom:1px solid var(--line,#dfe2e8)}.ds-message-meta{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:13px;margin-bottom:8px}.ds-message-meta span{color:var(--muted,#626570)}.ds-message-body{margin:0;max-width:72ch;white-space:pre-wrap;overflow-wrap:anywhere}.ds-message-status{display:block;margin-top:8px;font-size:13px;color:var(--muted,#626570)}.ds-reply-history{margin-top:32px}.ds-reply-heading{font-size:17px;font-weight:650;margin:0 0 20px}.ds-reply-badge{display:inline-block;border-radius:5px;padding:3px 8px;font:600 12px/1.5 -apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;background:var(--status-ground,#eee9f9);white-space:nowrap}.ds-reply-badge.ds-reply-approved{color:var(--success,#246644);background:var(--success-ground,#e5f3e9)}.ds-reply-revision{font-size:13px;color:var(--muted,#626570)}.ds-reply-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:14px 0 0}.ds-reply-approve{display:inline-flex;align-items:center;justify-content:center;gap:8px;background:var(--accent,#612bd3);color:var(--paper,#fff);border:1px solid transparent;border-radius:8px;font:600 15px/1.55 -apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;min-height:42px;padding:9px 17px;text-decoration:none;white-space:normal;cursor:pointer}.ds-reply-approve:hover{background:var(--accent-dark,#48199f)}.ds-reply-approve:focus-visible{outline:3px solid var(--focus,#8c66df);outline-offset:3px}.ds-reply-approve:disabled{cursor:not-allowed;opacity:.5}@media(max-width:760px){.ds-message-meta{align-items:flex-start}.ds-message-meta span{font-size:12px}}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Clear Workspace",
+    "overview": "The Wood Enterprises content service extends Postiz’s light interface with a quiet operating surface. Cool neutral ground, white work areas, and a single purple action color keep attention on the current company and its work. Typography is a compact system sans; hierarchy comes from size, weight, spacing, and explicit labels.\n\nThe interface is practical and moderately dense. Tables, divided rows, and bordered forms organize working information without decorative imagery or visual elevation. Color supports action and confirmed state, while visible text distinguishes draft, submission, publication, reply sending, failure, and uncertainty. This document records reusable rules from `public/app.css`, `public/app.js`, `public/inbox.js`, and `public/index.html`; the current surface composition remains in `SURFACE.md`.",
+    "keyCharacteristics": [
+      "Cool neutral ground and white work surfaces.",
+      "Purple actions and current navigation, with separate semantic state colors.",
+      "Compact system typography and sentence-case labels.",
+      "Flat borders and dividers, with gently rounded controls and containers.",
+      "Persistent visible focus and a single-column phone layout."
+    ],
+    "rules": [
+      {
+        "name": "The Action and State Rule",
+        "body": "Purple identifies actions and the current location; semantic state colors supplement explicit status words. Preserve the distinction between submitted and published content.",
+        "section": "colors"
+      },
+      {
+        "name": "The Readable Hierarchy Rule",
+        "body": "Use sentence-case text, dark headings, and muted supporting copy. Make the action or state readable in words rather than relying on color or decoration.",
+        "section": "typography"
+      },
+      {
+        "name": "The Border and Tone Rule",
+        "body": "Build ordinary surface hierarchy with paper, ground, borders, and spacing. Preserve this flat treatment when extending existing work panels.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** reuse the neutral canvas, white work surfaces, and purple action palette.",
+      "**Do** show status words alongside their semantic color, preserving submitted and published as distinct outcomes.",
+      "**Do** use the shared visible focus outline for interactive elements.",
+      "**Do** reflow forms and detail groups to a single column at the existing phone breakpoint.",
+      "**Do** use bordered panels for grouped work and dividers for repeated rows.",
+      "**Do** limit conversation previews while preserving complete, wrapping message and reply text in the reading pane.",
+      "**Do** honor reduced motion by disabling the workspace arrival animation."
+    ],
+    "donts": [
+      "**Don't** replace readable status text with color alone.",
+      "**Don't** add shadows or decorative gradients to the existing flat work-panel pattern.",
+      "**Don't** hide the business identity or the primary row action when reducing optional table detail.",
+      "**Don't** turn informational status badges into action controls without an explicit interaction design."
+    ]
+  }
+}

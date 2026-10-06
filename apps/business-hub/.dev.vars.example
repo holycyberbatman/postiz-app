@@ -1,0 +1,9 @@
+# Generate independent values with: openssl rand -hex 32
+HUB_ADMIN_TOKEN=
+TOKEN_ENCRYPTION_KEY=
+# Optional until channels are connected. Use your own Postiz origin, no /api suffix.
+POSTIZ_ORIGIN=
+FANVUE_CLIENT_ID=
+FANVUE_CLIENT_SECRET=
+# Register <hub origin>/oauth/fanvue/callback with Fanvue.
+PUBLIC_ORIGIN=http://localhost:8787
