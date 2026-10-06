@@ -1,10 +1,12 @@
 import { DurableObject } from 'cloudflare:workers';
 import { z } from 'zod';
 import type { Env } from './env';
-import { businessSchema, draftSchema, strategySchema, roleSchema, briefSchema, requireCompanyOrOwner, requireRole, json, errorResponse, HubError } from './model';
+import { businessSchema, draftSchema, strategySchema, roleSchema, briefSchema, engagementGrantSchema, requireCompanyOrOwner, requireRole, json, errorResponse, HubError } from './model';
 import type { Business, Actor, Draft, Strategy, TokenRecord, Credential, Channel, Brief, Service } from './model';
 import { hash, randomToken, seal, unseal } from './crypto';
-import { fanvue, fanvueToken, fanvuePublish, postiz, postizChannels, postizPublish, ProviderError } from './connectors';
+import { fanvue, fanvueToken, fanvuePublish, fanvueInbox, postiz, postizChannels, postizPublish, ProviderError } from './connectors';
+import { capabilityAreas, capabilitySnapshot } from './capabilities';
+import { EngagementService, engagementSchemas } from './engagement';
 
 const idInput = z.object({ id: z.string().min(1).max(150) }).strict();
 const revisionInput = idInput.extend({ revision: z.number().int().positive() });
@@ -32,7 +34,7 @@ export class BusinessWorkspace extends DurableObject<Env> {
           const { token } = await request.json() as { token: string };
           const record = await this.ctx.storage.get<TokenRecord>(`token:${await hash(token)}`);
           if (!record || record.revoked || record.expiresAt <= Date.now()) throw new HubError(401, 'Token is expired, revoked, or invalid');
-          return json({ id: record.id, role: record.role });
+          return json({ id: record.id, role: record.role, grants: record.grants || [] });
         }
         if (path === '/fanvue-callback') {
           const actor = JSON.parse(request.headers.get('X-Hub-Actor') || '{}') as Actor;
@@ -46,6 +48,7 @@ export class BusinessWorkspace extends DurableObject<Env> {
           const old = await this.credential();
           if (old && old.user.uuid !== credential.user.uuid) throw new HubError(409, 'Disconnect the current Fanvue account before connecting another creator');
           await this.ctx.storage.put('fanvue', await seal(credential, this.env.TOKEN_ENCRYPTION_KEY, `${business.id}:fanvue`));
+          await this.engagement(business).disable();
           await this.audit(actor, 'fanvue_connected', credential.user.uuid);
           return json({ connected: true });
         }
@@ -146,10 +149,46 @@ export class BusinessWorkspace extends DurableObject<Env> {
     if (brief.reviewPolicy !== 'wood_managed' && (service.companyApproval?.strategyVersion !== draft.strategyVersion || service.companyApproval?.briefRevision !== brief.revision)) throw new HubError(403, 'Company approval of the current strategy is required');
     if (brief.reviewPolicy === 'company_posts' && (draft.approvedByRole !== 'company' || draft.approvalBriefRevision !== brief.revision)) throw new HubError(403, 'The company must approve this post revision against its current brief');
   }
+  private engagement(business: Business) {
+    return new EngagementService(this.ctx.storage, {
+      business,
+      audit: (actor, action, resource) => this.audit(actor, action, resource),
+      connector: async (channelId, send) => {
+        const credential = await this.fanvueCredential();
+        if (channelId !== `fanvue:${credential.user.uuid}`) throw new HubError(403, 'This inbox channel does not belong to the connected creator');
+        if (!credential.scopes?.includes('read:chat') || (send && !credential.scopes.includes('write:chat'))) throw new HubError(403, 'Reconnect Fanvue with inbox access. The required chat scopes must be returned by Fanvue');
+        return fanvueInbox(this.env, credential);
+      },
+      assertRunning: async channelId => {
+        const service = await this.service();
+        if (service.status === 'paused') throw new HubError(409, 'The business service is paused');
+        if (!business.managedService) return;
+        const brief = await this.brief(business);
+        if (service.status !== 'active' || service.submittedRevision !== brief.revision) throw new HubError(409, 'Wood must launch the current company service before replying');
+        if (!brief.channels.some(channel => channel.channelId === channelId)) throw new HubError(403, 'This channel is outside the company service brief');
+      },
+    });
+  }
   async operate(actor: Actor, operation: string, input: unknown): Promise<unknown> {
     const business = await this.business();
-    if (actor.role === 'company' && !['get_business', 'get_operating_brief', 'save_onboarding', 'submit_onboarding', 'approve_strategy', 'list_channels', 'connect_postiz', 'disconnect_channel', 'list_drafts', 'get_draft', 'approve_draft', 'pause_service', 'list_reviews', 'list_audit', 'channel_analytics'].includes(operation)) throw new HubError(403, 'Wood Enterprises manages this operation');
+    // Authentication precedes this object's queue. Check revocation again at execution.
+    if (actor.role !== 'owner') {
+      const token = await this.ctx.storage.get<TokenRecord>(`token:${actor.id}`);
+      if (!token || token.revoked || token.expiresAt <= Date.now()) throw new HubError(401, 'Access expired or was revoked');
+      actor = { id: token.id, role: token.role, grants: token.grants || [] };
+    }
+    if (Object.hasOwn(engagementSchemas, operation)) return this.engagement(business).operate(actor, operation as keyof typeof engagementSchemas, input);
+    if (actor.role === 'company' && !['get_business', 'get_capabilities', 'get_operating_brief', 'save_onboarding', 'submit_onboarding', 'approve_strategy', 'list_channels', 'connect_postiz', 'disconnect_channel', 'list_drafts', 'get_draft', 'approve_draft', 'pause_service', 'list_reviews', 'list_audit', 'channel_analytics'].includes(operation)) throw new HubError(403, 'Wood Enterprises manages this operation');
     switch (operation) {
+      case 'get_capabilities': {
+        const { area } = z.object({ area: z.enum(capabilityAreas).optional() }).strict().parse(input);
+        return capabilitySnapshot(actor, area, {
+          businessId: business.id,
+          serviceStatus: business.managedService ? (await this.service()).status : 'legacy',
+          fanvue: { configured: !!(this.env.FANVUE_CLIENT_ID && this.env.FANVUE_CLIENT_SECRET), connected: !!await this.ctx.storage.get('fanvue') },
+          postiz: { configured: !!this.env.POSTIZ_ORIGIN, connected: !!await this.ctx.storage.get('postiz') },
+        });
+      }
       case 'get_operating_brief': {
         if (!business.managedService) return { managedService: false, business };
         return { managedService: true, business, ...await this.readiness(business) };
@@ -222,7 +261,7 @@ export class BusinessWorkspace extends DurableObject<Env> {
       }
       case 'get_business': {
         const fanvueAccount = await this.credential();
-        return { business, ...(business.managedService ? { service: await this.service(), onboarding: await this.brief(business) } : {}), strategy: await this.ctx.storage.get('strategy') || null, connections: { fanvue: fanvueAccount?.user || null, postiz: !!await this.ctx.storage.get('postiz') }, capabilities: { fanvueOAuth: !!(this.env.FANVUE_CLIENT_ID && this.env.FANVUE_CLIENT_SECRET), postiz: !!this.env.POSTIZ_ORIGIN }, postizOrigin: this.env.POSTIZ_ORIGIN || null, role: actor.role };
+        return { business, ...(business.managedService ? { service: await this.service(), onboarding: await this.brief(business) } : {}), strategy: await this.ctx.storage.get('strategy') || null, connections: { fanvue: fanvueAccount?.user || null, postiz: !!await this.ctx.storage.get('postiz') }, capabilities: { fanvueOAuth: !!(this.env.FANVUE_CLIENT_ID && this.env.FANVUE_CLIENT_SECRET), fanvueInbox: !!fanvueAccount?.scopes?.includes('read:chat'), fanvueReply: !!fanvueAccount?.scopes?.includes('write:chat'), postiz: !!this.env.POSTIZ_ORIGIN }, postizOrigin: this.env.POSTIZ_ORIGIN || null, role: actor.role, actorId: actor.id, grants: actor.grants || [] };
       }
       case 'update_business': {
         requireRole(actor, 'owner');
@@ -280,6 +319,7 @@ export class BusinessWorkspace extends DurableObject<Env> {
           }
         }
         await this.ctx.storage.delete(provider);
+        if (provider === 'fanvue') await this.engagement(business).disable();
         if (business.managedService) await this.holdService();
         await this.audit(actor, `${provider}_disconnected`, business.id);
         return { disconnected: true };
@@ -410,14 +450,21 @@ export class BusinessWorkspace extends DurableObject<Env> {
       case 'issue_company_access':
       case 'issue_token': {
         requireRole(actor, 'owner');
-        const grant = z.object({ name: z.string().min(1).max(120), role: roleSchema.exclude(['owner', 'company']), days: z.number().int().min(1).max(365).default(90) });
-        const { name, days, role } = operation === 'issue_company_access'
-          ? { ...grant.omit({ role: true }).strict().parse(input), role: 'company' as const }
+        const grant = z.object({ name: z.string().min(1).max(120), role: roleSchema.exclude(['owner', 'company']), days: z.number().int().min(1).max(365).default(90), grants: z.array(engagementGrantSchema).max(40).default([]) });
+        const { name, days, role, grants } = operation === 'issue_company_access'
+          ? { ...grant.omit({ role: true, grants: true }).strict().parse(input), role: 'company' as const, grants: [] }
           : grant.strict().parse(input);
         if (role === 'company' && !business.managedService) throw new HubError(409, 'Company access is for managed service workspaces');
+        if (grants.length) {
+          const channels = await this.channels();
+          for (const item of grants) {
+            if (!channels.some(channel => channel.id === item.channelId && channel.provider === 'fanvue')) throw new HubError(400, 'Engagement grants require a connected Fanvue channel');
+            if (!item.actions.includes('inbox:read') || (item.actions.includes('reply:draft') && role === 'reader') || (item.actions.includes('reply:send') && (role !== 'publisher' || !item.actions.includes('reply:draft')))) throw new HubError(400, 'Read access is required; drafting needs editor access and sending needs publisher access with drafting');
+          }
+        }
         const token = `bh.${business.id}.${randomToken()}`;
         const id = await hash(token);
-        const record: TokenRecord = { id, name, role, createdAt: iso(), expiresAt: Date.now() + days * 86400000 };
+        const record: TokenRecord = { id, name, role, grants, createdAt: iso(), expiresAt: Date.now() + days * 86400000 };
         await this.ctx.storage.put(`token:${id}`, record);
         await this.audit(actor, 'token_issued', id);
         return { token, ...record };

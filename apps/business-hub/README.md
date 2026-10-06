@@ -4,6 +4,8 @@ A shared content operation for Wood Enterprises and its operating companies, bui
 
 **Launch status:** the hub can be deployed independently. Real social publishing requires a reachable Postiz instance and its organization API keys; Fanvue requires an approved OAuth app and a connected creator. No businesses, accounts, agent jobs, or sample posts are seeded into production.
 
+**Product target:** a full Wood Enterprises social operation with the major commercial publishing, collaboration, inbox, analytics, and agent workflows. The current hub is a foundation, not commercial parity. [CAPABILITIES.md](CAPABILITIES.md) records the acceptance baseline, implementation gaps and Cloudflare rewrite sequence; [FANVUE-CONTRACT.md](FANVUE-CONTRACT.md) records the current Fanvue API evidence and scope requirements.
+
 ## What is implemented
 
 - Company onboarding in four saveable steps: business and measurable goals, audience and brand, channels, and the review policy.
@@ -13,8 +15,10 @@ A shared content operation for Wood Enterprises and its operating companies, bui
 - Versioned content strategies: objectives, pillars, channel cadence, guardrails, and measures of success. An owner activates each version.
 - Revisioned drafts, policy-specific approval, durable scheduling, cancellation, publication receipts, outcome reconciliation, audit history, and measured strategy reviews.
 - Fanvue OAuth with PKCE, refresh token rotation, direct publishing, multipart media upload tools, media readiness checks, post retrieval, and account-level metrics.
+- Fanvue inbox for existing conversations: paged private history, explicit read/draft/send grants, exclusive claims, revision-bound human review, text replies, human takeover, daily limits and uncertain-send reconciliation. See [ENGAGEMENT.md](ENGAGEMENT.md).
 - Postiz organization connections for its existing social providers, post submission, post status retrieval, and channel analytics.
 - Expiring, revocable reader/editor/publisher tokens scoped to one business; Streamable HTTP MCP at `/mcp/{business-id}`.
+- Capability discovery through `get_capabilities`: current feature coverage, role/grant-visible tools and connector boundaries. It does not assert provider health, OAuth grants, or live verification.
 - A responsive portal for company representatives, Wood operators, and agents with matching permissions.
 
 Fanvue is implemented in this Worker hub. It does **not** add a Fanvue tile to the original Postiz calendar UI. Social posts submitted through Postiz appear in Postiz; direct Fanvue posts appear in Fanvue and this hub.
@@ -34,7 +38,7 @@ flowchart LR
   Postiz --> Social[Social platforms]
 ```
 
-The existing Postiz application requires long-running services and persistent databases. This fork keeps those services separate and puts the new business control layer on Workers. The hub uses the public Postiz API; it does not import the NestJS server into a Worker. The upstream frontend, orchestration workflows, Prisma schema, and provider implementations are untouched.
+The diagram shows the current architecture. The existing Postiz application requires long-running services and persistent databases; the hub currently connects through its public API. The rewrite target moves workflows and provider adapters into the new application incrementally, retaining the bridge until replacements are verified. The upstream frontend, orchestration workflows, Prisma schema, and provider implementations are currently untouched.
 
 ## Local development
 
@@ -55,7 +59,7 @@ pnpm test
 pnpm build
 ```
 
-Tests use real workerd/Durable Objects through Miniflare and a real MCP client. Provider traffic is mocked; tests never publish to real accounts. Coverage includes cross-business isolation, company/operator boundaries, onboarding revisions, launch requirements, company approval, service pauses, unchanged-brief preservation, portfolio synchronization, Origin and input validation, idempotency, durable alarms, ambiguous outcomes, 429 retries, OAuth replay, token refresh, media ownership, automatic publishing policy, and revocation. `pnpm build` is a Wrangler deployment dry run.
+Tests use real workerd/Durable Objects through Miniflare and a real MCP client. Provider traffic is mocked; tests never publish to real accounts. Coverage includes cross-business isolation, company/operator boundaries, onboarding revisions, launch requirements, company approval, service pauses, unchanged-brief preservation, portfolio synchronization, Origin and input validation, idempotency, durable alarms, ambiguous outcomes, 429 retries, OAuth replay, token refresh, media ownership, automatic publishing policy, revocation, private conversation grants, reply review/context changes, human takeover, malformed message receipts and ambiguous-send holds. `pnpm build` is a Wrangler deployment dry run.
 
 ## Deployment and onboarding
 
@@ -72,6 +76,7 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for Worker secrets, Fanvue app setup, and a p
 - Daily limits count scheduling reservations in the business timezone. Cancelling or failing a post does not refund its reservation. A business can have at most 1,000 pending posts.
 - A remote publication cannot be transacted atomically with Durable Object storage. Ambiguous responses and interrupted publications are held as `uncertain`, never blindly retried. The owner verifies the destination and reconciles. An explicit 429 is retried at most four times after the initial attempt.
 - Postiz acceptance is `submitted`, not proof of publication. Agents can inspect `postiz_posts` or the native Postiz UI for final outcomes. The hub does not yet synchronize every subsequent Postiz delivery status automatically.
+- Engagement is off by default and separate from publishing. Existing tokens retain their permissions. Only reviewed text replies to existing Fanvue conversations are supported; no automatic replies, paid/bulk sends, comment actions, or attachment replies. Latest history is checked before sending, but the provider does not make read/check/send atomic. Claims coordinate hub users, not operators using Fanvue directly.
 - There is no built-in LLM runner or autonomous agent scheduler. Your existing agent runtime connects to MCP and drives the strategy loop. No autonomous team has been started by deploying the hub.
 - Fanvue uploads are available through REST/MCP; the dashboard accepts vault media UUIDs. Postiz media must already be uploaded to Postiz and use its provider-specific settings.
 - This release does not include webhooks, a shared R2 asset library, automated credential backup/export, or a full upstream Postiz build verification. The supplied persistent-host recipe must be validated on its target host.

@@ -69,7 +69,7 @@ async function route(request: Request, env: Env): Promise<Response> {
     const body = new TextDecoder().decode(buffer);
     request = new Request(request.url, { method: request.method, headers: request.headers, body: body || undefined });
   }
-  if (pathname === '/health') return json({ service: 'postiz-business-hub', status: env.HUB_ADMIN_TOKEN?.length >= 32 && env.TOKEN_ENCRYPTION_KEY ? 'ready' : 'setup_required', version: '0.2.0' });
+  if (pathname === '/health') return json({ service: 'postiz-business-hub', status: env.HUB_ADMIN_TOKEN?.length >= 32 && env.TOKEN_ENCRYPTION_KEY ? 'ready' : 'setup_required', version: '0.3.0' });
   if (pathname === '/api/session' && request.method === 'POST') {
     const { token } = z.object({ token: z.string().min(1).max(4096) }).strict().parse(await request.json());
     const auth = await authenticate(new Request(request.url, { headers: { Authorization: `Bearer ${token}` } }), env);
@@ -127,6 +127,7 @@ async function route(request: Request, env: Env): Promise<Response> {
     const operation = match[3] || 'get_business';
     if (operation === 'connect_fanvue' && request.method === 'POST') {
       requireCompanyOrOwner(auth.actor);
+      const { engagement } = z.object({ engagement: z.boolean().default(false) }).strict().parse(await request.json());
       if (!env.FANVUE_CLIENT_ID || !env.FANVUE_CLIENT_SECRET) throw new HubError(503, 'Configure FANVUE_CLIENT_ID and FANVUE_CLIENT_SECRET before connecting');
       const exists = await workspace(env, businessId, auth.actor, 'get_business');
       if (!exists.ok) return exists;
@@ -136,7 +137,7 @@ async function route(request: Request, env: Env): Promise<Response> {
       const saved = await env.DIRECTORY.getByName('directory').fetch('https://internal/oauth/create', { method: 'POST', body: JSON.stringify({ state, data }) });
       if (!saved.ok) return saved;
       const authorize = new URL('https://auth.fanvue.com/oauth2/auth');
-      authorize.search = new URLSearchParams({ client_id: env.FANVUE_CLIENT_ID, redirect_uri: redirectUri, response_type: 'code', scope: 'openid offline_access offline read:self read:post write:post read:media write:media', state, code_challenge: await hash(verifier), code_challenge_method: 'S256' }).toString();
+      authorize.search = new URLSearchParams({ client_id: env.FANVUE_CLIENT_ID, redirect_uri: redirectUri, response_type: 'code', scope: `openid offline_access offline read:self read:post write:post read:media write:media${engagement ? ' read:chat write:chat' : ''}`, state, code_challenge: await hash(verifier), code_challenge_method: 'S256' }).toString();
       const response = json({ url: authorize.toString() });
       response.headers.set('Set-Cookie', sessionCookie(request, 'fanvue_state', browserCookie, 600, 'Lax'));
       return response;

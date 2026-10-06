@@ -30,6 +30,8 @@ Cloudflare creates the directory and per-business SQLite Durable Object namespac
 
 Version 0.2 adds managed-service records within the existing Durable Objects; no new namespace or migration is needed. New companies default to managed onboarding. Existing businesses without `managedService` keep the legacy approval workflow and are not automatically enrolled. Company access is distinct from agent access and cannot use MCP.
 
+Version 0.3 adds engagement policy, claims, reply records, request indexes and daily attempt counters in the same business objects. Existing publishing credentials/tokens continue to work. Engagement defaults off, old tokens receive no conversation grants, and old Fanvue credentials without recorded chat scopes cannot read or send messages. No extra Cloudflare resource, secret rotation or namespace migration is needed. Rollback to an older release hides these workflows without deleting their records; do not treat rollback as revoking provider access.
+
 ## Read-only release check
 
 After deploying, run `pnpm smoke https://YOUR-HUB.example.com`. It uses `HUB_SMOKE_TOKEN` from the environment or the private production secret file and checks health, the dashboard, authentication, cookie flags, Origin protection, and a real MCP handshake. It does not create a business, credential, strategy, or post. Only use it with the trusted deployment origin.
@@ -49,7 +51,9 @@ pnpm exec wrangler secret put FANVUE_CLIENT_ID
 pnpm exec wrangler secret put FANVUE_CLIENT_SECRET
 ```
 
-Requested scopes: `openid offline_access offline read:self read:post write:post read:media write:media`. The implementation uses authorization code + S256 PKCE, HTTP Basic client authentication, a browser-bound single-use state, and refresh token rotation. The pinned API version is `2025-06-26`; the API base is `https://api.fanvue.com/v1`. Authorize the intended creator from that company’s Channels tab using Wood or company access. Fanvue must return a creator account. Revoked or expired company access cannot finish an OAuth connection started earlier.
+Publishing scopes: `openid offline_access offline read:self read:post write:post read:media write:media`. The explicit **Connect publishing + inbox** action also requests `read:chat write:chat`; the provider must return those scopes before inbox operations are permitted. The implementation uses authorization code + S256 PKCE, HTTP Basic client authentication, a browser-bound single-use state, and refresh token rotation. The pinned API version is `2025-06-26`; the API base is `https://api.fanvue.com/v1`. Authorize the intended creator from that company’s Channels tab using Wood or company access. Fanvue must return a creator account. Revoked or expired company access cannot finish an OAuth connection started earlier.
+
+Follow [ENGAGEMENT.md](ENGAGEMENT.md) to enable reviewed replies, issue channel-specific conversation grants and verify the read/claim/draft/approve/send/handoff workflow. Deployment does not connect a creator, enable the policy, grant an existing agent private-data access, or send a message. Reconnects disable the engagement policy until it is reviewed again.
 
 Each business has one Fanvue creator connection. Keep a creator assigned to one business when distinct tenant isolation is required; connecting the same account to multiple businesses would intentionally share access to that account’s content. Revoke access through Disconnect Fanvue or in Fanvue itself. Changing to a different creator requires disconnecting first.
 

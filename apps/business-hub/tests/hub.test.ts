@@ -12,7 +12,13 @@ const creator = '123e4567-e89b-42d3-a456-426614174000';
 let mf: Miniflare;
 let directory: string;
 let externalPosts: Record<string, number> = {};
+let providerRequestCount = 0;
 let providerMode = 'success';
+let fanvueScopes: string | undefined;
+const fan = '550e8400-e29b-41d4-a716-446655440001';
+let chatMessages = [{ uuid: '550e8400-e29b-41d4-a716-446655440010', text: 'What is coming up this week?', sentAt: '2026-10-04T10:00:00Z', sender: { uuid: fan, handle: 'synthetic-fan' }, recipient: { uuid: creator, handle: 'test-creator' }, status: 'SENT', type: 'SINGLE_RECIPIENT', gif: null }];
+let chatSends = 0;
+let chatMode = 'success';
 let tokenExchanges: Array<URLSearchParams> = [];
 let tokens: Record<string, string> = {};
 let base = '';
@@ -35,6 +41,7 @@ beforeAll(async () => {
     bindings: { HUB_ADMIN_TOKEN: admin, TOKEN_ENCRYPTION_KEY: 'ab'.repeat(32), PUBLIC_ORIGIN: 'https://hub.test', POSTIZ_ORIGIN: 'https://postiz.test', FANVUE_API_VERSION: '2025-06-26', FANVUE_CLIENT_ID: 'test-client', FANVUE_CLIENT_SECRET: 'test-secret' },
     serviceBindings: { ASSETS: () => new MFResponse('Test assets') },
     outboundService: async (request: MFRequest) => {
+      providerRequestCount += 1;
       const url = new URL(request.url);
       if (url.hostname === 'postiz.test') {
         if (url.pathname.endsWith('/integrations')) {
@@ -56,11 +63,27 @@ beforeAll(async () => {
         const values = new URLSearchParams(await request.text());
         tokenExchanges.push(values);
         expect(values.has('client_secret')).toBe(false);
-        return MFResponse.json({ access_token: 'fanvue-access', refresh_token: 'fanvue-refresh', expires_in: values.get('grant_type') === 'authorization_code' ? 60 : 3600 });
+        return MFResponse.json({ access_token: 'fanvue-access', refresh_token: 'fanvue-refresh', expires_in: values.get('grant_type') === 'authorization_code' ? 60 : 3600, ...(fanvueScopes ? { scope: fanvueScopes } : {}) });
       }
       if (url.hostname === 'api.fanvue.com') {
         expect(request.headers.get('X-Fanvue-API-Version')).toBe('2025-06-26');
         if (url.pathname === '/v1/users/me') return MFResponse.json({ uuid: creator, handle: 'test-creator', displayName: 'Test creator', isCreator: true, isAiCreator: false });
+        if (url.pathname === '/v1/chats') return MFResponse.json({ data: [{ user: { uuid: fan, handle: 'synthetic-fan', displayName: 'Synthetic fan' }, isRead: false, lastMessageAt: chatMessages[0].sentAt, lastMessage: { text: chatMessages[0].text } }], nextCursor: url.searchParams.has('cursor') ? null : 'page-next' });
+        if (url.pathname === `/v1/chats/${fan}/messages`) {
+          expect(url.searchParams.get('markAsRead')).toBe('false');
+          return MFResponse.json({ data: url.searchParams.has('sentBefore') ? [] : chatMessages, dateFilter: url.searchParams.has('sentBefore') ? null : { sentBefore: '2026-10-04T09:00:00Z', receivedBefore: '2026-10-04T09:00:00Z' } });
+        }
+        if (url.pathname === `/v1/chats/${fan}/message` && request.method === 'POST') {
+          const body = await request.json() as any;
+          expect(Object.keys(body)).toEqual(['text']);
+          chatSends += 1;
+          if (chatMode === 'ambiguous') return MFResponse.json({}, { status: 503 });
+          if (chatMode === 'missing-receipt') return MFResponse.json({});
+          if (chatMode === 'rejected') return MFResponse.json({}, { status: 429 });
+          const messageUuid = `550e8400-e29b-41d4-a716-${String(chatSends).padStart(12, '0')}`;
+          chatMessages.unshift({ uuid: messageUuid, text: body.text, sentAt: new Date().toISOString(), sender: { uuid: creator, handle: 'test-creator' }, recipient: { uuid: fan, handle: 'synthetic-fan' }, status: 'SENT', type: 'SINGLE_RECIPIENT', gif: null });
+          return MFResponse.json({ messageUuid }, { status: 201 });
+        }
         if (url.pathname === '/v1/media/uploads') return MFResponse.json({ uploadId: 'upload-alpha', mediaUuid: creator, partSize: 5242880, totalParts: 2, maxParts: 10000 });
         if (url.pathname === '/v1/media/uploads/upload-alpha/parts/urls') {
           expect(url.search).toBe('?from=1&to=1');
@@ -233,6 +256,49 @@ describe.sequential('Business boundaries and content lifecycle', () => {
   });
 });
 
+describe('Capability discovery', () => {
+  test('reports implementation gaps without contacting providers or exposing credentials', async () => {
+    const before = providerRequestCount;
+    const result = await op('get_capabilities', {}, tokens.reader);
+    expect(result.status).toBe(200);
+    expect(providerRequestCount).toBe(before);
+    expect(result.body.businessId).toBe('alpha');
+    expect(result.body.commercialParity).toBe(false);
+    expect(result.body.connectors.postiz).toMatchObject({ connected: true, implementation: 'bridge', scopeVerification: 'not_recorded' });
+    expect(result.body.connectors.fanvue.notImplemented).toContain('message.mass_send');
+    expect(result.body.features.find((feature: any) => feature.id === 'unified_inbox')).toMatchObject({ coverage: 'partial', tools: [] });
+    const serialized = JSON.stringify(result.body);
+    for (const secret of [admin, tokens.reader, 'alpha-postiz-key', 'fanvue-access', 'fanvue-refresh', 'test-secret']) expect(serialized).not.toContain(secret);
+    expect((await op('get_capabilities', {}, tokens.reader, 'beta')).status).toBe(403);
+    expect((await op('get_capabilities', { businessId: 'beta' }, tokens.reader)).status).toBe(400);
+  });
+  test('area filtering and MCP role discovery agree without granting missing workflow operations', async () => {
+    expect((await op('get_capabilities', { area: 'unknown' }, tokens.reader)).status).toBe(400);
+    const engagement = await op('get_capabilities', { area: 'engagement' }, tokens.publisher);
+    expect(engagement.body.features.length).toBeGreaterThan(0);
+    expect(engagement.body.features.every((feature: any) => feature.area === 'engagement')).toBe(true);
+    expect(engagement.body.features.flatMap((feature: any) => feature.tools)).toEqual(['get_engagement_policy']);
+    for (const role of ['reader', 'editor', 'publisher']) {
+      const client = new Client({ name: 'capabilities-test', version: '1.0.0' });
+      await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp/alpha`), { requestInit: { headers: { Authorization: `Bearer ${tokens[role]}` } } }));
+      try {
+        const discovered = (await client.listTools()).tools.map(tool => tool.name);
+        const result = await client.callTool({ name: 'get_capabilities', arguments: {} });
+        expect(result.isError).toBe(false);
+        const catalog = JSON.parse((result.content as Array<{ type: string; text: string }>)[0].text);
+        const advertised = catalog.features.flatMap((feature: any) => feature.tools);
+        expect(advertised.every((name: string) => discovered.includes(name))).toBe(true);
+        expect(advertised.includes('schedule_draft')).toBe(role === 'publisher');
+        expect(advertised.includes('create_draft')).toBe(role !== 'reader');
+        expect(discovered).not.toContain('send_message');
+      } finally { await client.close(); }
+    }
+    const before = providerRequestCount;
+    expect((await op('send_message', {}, tokens.publisher)).status).toBe(404);
+    expect(providerRequestCount).toBe(before);
+  });
+});
+
 describe.sequential('Wood Enterprises managed service', () => {
   const business = 'oak-company';
   let company = '';
@@ -263,6 +329,13 @@ describe.sequential('Wood Enterprises managed service', () => {
     for (const operation of ['issue_token', 'issue_company_access', 'start_service', 'save_strategy', 'update_business', 'resolve_uncertain', 'get_summary']) expect((await managed(operation, {}, company)).status).toBe(403);
     expect((await mf.dispatchFetch(`${base}/mcp/${business}`, { method: 'POST', headers: { Authorization: `Bearer ${company}` }, body: '{}' })).status).toBe(403);
     expect((await managed('issue_token', { name: 'Forged company grant', role: 'company' })).status).toBe(400);
+  });
+  test('company portal discovery exposes its mandate state without agent tool access', async () => {
+    const result = await managed('get_capabilities', {}, company);
+    expect(result.status).toBe(200);
+    expect(result.body).toMatchObject({ businessId: business, serviceStatus: 'onboarding' });
+    expect(result.body.features.flatMap((feature: any) => feature.tools)).toEqual([]);
+    expect((await op('get_capabilities', {}, company, 'alpha')).status).toBe(403);
   });
   test('onboarding drafts save incrementally, enforce revisions, and reject invalid links', async () => {
     const saved = await managed('save_onboarding', { revision: 0, brief: { name: brief.name, timezone: brief.timezone } }, company);
@@ -367,5 +440,192 @@ describe.sequential('Wood Enterprises managed service', () => {
     expect(response.status).toBe(401);
     expect((await managed('get_business')).body.connections.fanvue).toBeNull();
     expect((await managed('save_onboarding', { revision: briefRevision, brief }, company)).status).toBe(401);
+  });
+});
+
+describe.sequential('Fanvue engagement with distinct consent and grants', () => {
+  const business = 'engage-team';
+  const channelId = `fanvue:${creator}`;
+  const address = { channelId, userId: fan };
+  let writer = ''; let observer = ''; let second = ''; let writerId = '';
+  const engage = (operation: string, input: unknown = {}, token = admin) => op(operation, input, token, business);
+  async function connect(scopes?: string) {
+    fanvueScopes = scopes;
+    const start = await engage('connect_fanvue', { engagement: true });
+    expect(start.status).toBe(200);
+    const url = new URL(start.body.url);
+    expect(url.searchParams.get('scope')).toContain('read:chat write:chat');
+    const result = await mf.dispatchFetch(`https://hub.test/oauth/fanvue/callback?state=${url.searchParams.get('state')}&code=engagement`, { headers: { Cookie: start.headers.get('Set-Cookie')!.split(';')[0] }, redirect: 'manual' });
+    expect(result.status).toBe(303);
+  }
+  async function policy(enabled = true, dailyReplyLimit = 20) {
+    const old = (await engage('get_engagement_policy')).body;
+    const result = await engage('save_engagement_policy', { revision: old.revision, policy: { enabled, channelIds: [channelId], dailyReplyLimit, instructions: 'Answer only from the approved company brief. Escalate account and payment questions.', replyMode: 'approval' } });
+    expect(result.status).toBe(200);
+  }
+  async function makeReply(requestId: string) {
+    const context = await engage('get_conversation', address, writer);
+    expect(context.status).toBe(200);
+    const conversationRevision = context.body.conversation.revision;
+    expect((await engage('claim_conversation', { ...address, conversationRevision }, writer)).status).toBe(200);
+    const input = { ...address, requestId, conversationRevision, text: 'The next update will be shared on the channel.' };
+    const reply = await engage('create_reply', input, writer);
+    expect(reply.status).toBe(200);
+    return { reply: reply.body, input, ref: { ...address, id: reply.body.id, revision: reply.body.revision } };
+  }
+  test('old publishing access cannot read chats; opt-in consent records scopes and old tokens retain their permissions', async () => {
+    expect((await api('/api/businesses', { id: business, name: 'Synthetic engagement test', timezone: 'America/New_York', managedService: false })).status).toBe(201);
+    const basic = await engage('connect_fanvue');
+    expect(new URL(basic.body.url).searchParams.get('scope')).not.toContain('read:chat');
+    await connect();
+    expect((await engage('list_conversations', { channelId })).status).toBe(403);
+    await connect('read:self read:post write:post read:media write:media read:chat write:chat');
+    await policy();
+    const issued = await engage('issue_token', { name: 'Engagement team', role: 'publisher', grants: [{ channelId, actions: ['inbox:read', 'reply:draft', 'reply:send'] }] });
+    writer = issued.body.token; writerId = issued.body.id;
+    observer = (await engage('issue_token', { name: 'Conversation reader', role: 'reader', grants: [{ channelId, actions: ['inbox:read'] }] })).body.token;
+    second = (await engage('issue_token', { name: 'Second team', role: 'publisher', grants: [{ channelId, actions: ['inbox:read', 'reply:draft', 'reply:send'] }] })).body.token;
+    const ordinary = (await engage('issue_token', { name: 'Publishing only', role: 'publisher' })).body.token;
+    const before = providerRequestCount;
+    expect((await engage('list_conversations', { channelId }, ordinary)).status).toBe(403);
+    expect(providerRequestCount).toBe(before);
+    expect((await op('list_conversations', { channelId }, writer, 'beta')).status).toBe(403);
+    expect((await engage('list_conversations', { channelId: `fanvue:${fan}` }, writer)).status).toBe(403);
+    expect((await engage('issue_token', { name: 'Invalid role grant', role: 'reader', grants: [{ channelId, actions: ['inbox:read', 'reply:send'] }] })).status).toBe(400);
+    expect((await engage('save_engagement_policy', { revision: 2, policy: {} }, writer)).status).not.toBe(200);
+  });
+  test('history pagination leaves read state unchanged and MCP discovers only explicitly granted actions', async () => {
+    const list = await engage('list_conversations', { channelId }, observer);
+    expect(list.body.items[0]).toMatchObject({ userId: fan, unread: true });
+    expect(list.body.nextCursor).toBe('page-next');
+    expect((await engage('list_conversations', { channelId, cursor: list.body.nextCursor }, observer)).body.nextCursor).toBeNull();
+    const history = await engage('get_conversation', address, observer);
+    expect(history.body.messages).toHaveLength(1);
+    const older = await engage('get_conversation', { ...address, ...history.body.next }, observer);
+    expect(older.body).toMatchObject({ historical: true, messages: [], next: null });
+    expect(older.body.conversation.revision).toBe(history.body.conversation.revision);
+    for (const [token, canSend] of [[writer, true], [observer, false]] as const) {
+      const client = new Client({ name: 'engagement-test', version: '1.0.0' });
+      await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp/${business}`), { requestInit: { headers: { Authorization: `Bearer ${token}` } } }));
+      const names = (await client.listTools()).tools.map(tool => tool.name);
+      expect(names).toContain('list_conversations');
+      expect(names.includes('send_reply')).toBe(canSend);
+      expect(names).not.toContain('approve_reply');
+      const result = await client.callTool({ name: 'list_conversations', arguments: { channelId } });
+      expect(result.isError).toBe(false);
+      const coverage = (await engage('get_capabilities', {}, token)).body.features.flatMap((feature: any) => feature.tools);
+      expect(new Set(coverage)).toEqual(new Set(names));
+      await client.close();
+    }
+  });
+  test('exclusive claims, review, strict text-only inputs and send idempotency prevent duplicate replies', async () => {
+    const value = await makeReply('reply-reviewed-once');
+    expect((await engage('claim_conversation', { ...address, conversationRevision: value.input.conversationRevision }, second)).status).toBe(409);
+    expect((await engage('create_reply', value.input, writer)).body.id).toBe(value.reply.id);
+    expect((await engage('create_reply', { ...value.input, text: 'Changed' }, writer)).status).toBe(409);
+    expect((await engage('create_reply', { ...value.input, price: 300 }, writer)).status).toBe(400);
+    expect((await engage('create_reply', { ...value.input, mediaUuids: [creator] }, writer)).status).toBe(400);
+    expect((await engage('send_reply', value.ref, observer)).status).toBe(403);
+    expect((await engage('send_reply', value.ref, writer)).status).toBe(409);
+    expect((await engage('approve_reply', value.ref, writer)).status).toBe(403);
+    expect((await engage('approve_reply', value.ref)).status).toBe(200);
+    const before = chatSends;
+    const results = await Promise.all([engage('send_reply', value.ref, writer), engage('send_reply', value.ref, writer)]);
+    expect(results.map(item => item.body.status)).toEqual(['sent', 'sent']);
+    expect(chatSends).toBe(before + 1);
+    expect(results[0].body.messageId).toBeTruthy();
+    expect((await engage('cancel_reply', value.ref, writer)).status).toBe(409);
+  });
+  test('a new audience message or edited copy invalidates prior approval', async () => {
+    const value = await makeReply('reply-stale-context');
+    await engage('approve_reply', value.ref);
+    chatMessages.unshift({ ...chatMessages[chatMessages.length - 1], uuid: '550e8400-e29b-41d4-a716-446655440099', text: 'Actually, I have another question.' });
+    const before = chatSends;
+    expect((await engage('send_reply', value.ref, writer)).status).toBe(409);
+    const current = await engage('get_conversation', address, writer);
+    const edited = await engage('update_reply', { ...value.ref, conversationRevision: current.body.conversation.revision, text: 'Thanks for the update. Wood will review your question.' }, writer);
+    expect(edited.body).toMatchObject({ revision: 2, status: 'draft' });
+    expect(edited.body.approvedBy).toBeUndefined();
+    expect((await engage('send_reply', { ...value.ref, revision: 2 }, writer)).status).toBe(409);
+    expect(chatSends).toBe(before);
+  });
+  test('human takeover and policy changes invalidate pending work', async () => {
+    const value = await makeReply('reply-handoff');
+    await engage('approve_reply', value.ref);
+    const takeover = await engage('set_conversation_state', { ...address, conversationRevision: value.input.conversationRevision, mode: 'human', status: 'open' });
+    expect(takeover.status).toBe(200);
+    expect((await engage('send_reply', value.ref, writer)).status).toBe(409);
+    expect((await engage('claim_conversation', { ...address, conversationRevision: takeover.body.revision }, writer)).status).toBe(409);
+    expect((await engage('set_conversation_state', { ...address, conversationRevision: takeover.body.revision, mode: 'agent', status: 'open' }, writer)).status).toBe(403);
+    await engage('set_conversation_state', { ...address, conversationRevision: takeover.body.revision, mode: 'agent', status: 'open' });
+    const revised = await makeReply('reply-policy-change');
+    await engage('approve_reply', revised.ref);
+    await policy();
+    expect((await engage('send_reply', revised.ref, writer)).status).toBe(409);
+  });
+  test('ambiguous sends and missing receipts hold the conversation until manual reconciliation', async () => {
+    for (const mode of ['ambiguous', 'missing-receipt']) {
+      const value = await makeReply(`reply-${mode}`);
+      await engage('approve_reply', value.ref);
+      chatMode = mode;
+      const before = chatSends;
+      expect((await engage('send_reply', value.ref, writer)).body.status).toBe('uncertain');
+      expect((await engage('send_reply', value.ref, writer)).status).toBe(409);
+      expect((await engage('create_reply', { ...value.input, requestId: `replacement-${mode}` }, writer)).status).toBe(409);
+      expect(chatSends).toBe(before + 1);
+      expect((await engage('reconcile_reply', { ...address, id: value.reply.id, outcome: 'not_sent', evidence: 'Verified on the synthetic provider account.' }, writer)).status).toBe(403);
+      expect((await engage('reconcile_reply', { ...address, id: value.reply.id, outcome: 'sent', evidence: 'Verified on the synthetic provider account.' })).status).toBe(400);
+      expect((await engage('reconcile_reply', { ...address, id: value.reply.id, outcome: 'not_sent', evidence: 'Verified no message on the synthetic provider account.' })).body.status).toBe('failed');
+    }
+    chatMode = 'success';
+  });
+  test('rate limits do not retry automatically and business daily limits stop further delivery', async () => {
+    const value = await makeReply('reply-rate-limit');
+    await engage('approve_reply', value.ref);
+    chatMode = 'rejected'; const before = chatSends;
+    expect((await engage('send_reply', value.ref, writer)).body.status).toBe('failed');
+    expect((await engage('send_reply', value.ref, writer)).status).toBe(409);
+    expect(chatSends).toBe(before + 1); chatMode = 'success';
+    await policy(true, 1);
+    const capped = await makeReply('reply-daily-cap');
+    await engage('approve_reply', capped.ref);
+    expect((await engage('send_reply', capped.ref, writer)).status).toBe(409);
+    expect(chatSends).toBe(before + 1);
+    await policy();
+  });
+  test('pause, disabled policy, revocation and disconnection each close the send boundary', async () => {
+    const value = await makeReply('reply-pause');
+    await engage('approve_reply', value.ref);
+    await engage('pause_service');
+    const before = chatSends;
+    expect((await engage('send_reply', value.ref, writer)).status).toBe(409);
+    await policy(false);
+    expect((await engage('send_reply', value.ref, writer)).status).toBe(403);
+    await engage('revoke_token', { id: writerId });
+    expect((await engage('get_conversation', address, writer)).status).toBe(401);
+    await engage('disconnect_channel', { provider: 'fanvue' });
+    expect((await engage('get_engagement_policy')).body.enabled).toBe(false);
+    expect((await engage('get_conversation', address, observer)).status).toBe(409);
+    expect(chatSends).toBe(before);
+  });
+  test('effective scope reduction prevents sending and audit does not reveal counterpart IDs or copy', async () => {
+    await connect('read:self read:chat');
+    expect((await engage('list_conversations', { channelId }, observer)).status).toBe(200);
+    const old = (await engage('get_engagement_policy')).body;
+    const { revision, ...configuration } = old;
+    expect((await engage('save_engagement_policy', { revision, policy: { ...configuration, enabled: true } })).status).toBe(403);
+    const audit = JSON.stringify((await engage('list_audit', {}, observer)).body);
+    expect(audit).not.toContain(fan);
+    expect(audit).not.toContain('The next update will be shared');
+    expect((await engage('send_reply', { ...address, id: crypto.randomUUID(), revision: 1 }, second)).status).toBe(403);
+  });
+  test('history with the wrong counterpart fails closed without exposing its contents', async () => {
+    const original = chatMessages;
+    chatMessages = [{ ...chatMessages[0], sender: { uuid: creator, handle: 'creator' }, recipient: { uuid: creator, handle: 'creator' }, text: 'Private unrelated conversation' }];
+    try {
+      const result = await engage('get_conversation', address, observer);
+      expect(result.status).toBe(500);
+      expect(JSON.stringify(result.body)).not.toContain('Private unrelated conversation');
+    } finally { chatMessages = original; }
   });
 });

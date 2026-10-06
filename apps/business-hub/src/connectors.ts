@@ -1,6 +1,7 @@
 import type { Credential, Draft, Channel } from './model';
 import { HubError } from './model';
 import type { Env } from './env';
+import { z } from 'zod';
 
 export class ProviderError extends Error {
   constructor(public status: number, public retryAfter = 60, public ambiguous = false) { super(`Provider returned ${status}`); }
@@ -31,7 +32,49 @@ export async function fanvueToken(env: Env, values: Record<string, string>) {
     body: new URLSearchParams(values).toString(),
   });
   if (typeof result.access_token !== 'string' || typeof result.refresh_token !== 'string' || !Number.isFinite(result.expires_in) || result.expires_in <= 0) throw new ProviderError(502);
-  return { access_token: result.access_token as string, refresh_token: result.refresh_token as string, expires_at: Date.now() + result.expires_in * 1000 };
+  return { access_token: result.access_token as string, refresh_token: result.refresh_token as string, expires_at: Date.now() + result.expires_in * 1000,
+    ...(typeof result.scope === 'string' ? { scopes: [...new Set<string>(result.scope.split(/\s+/).filter(Boolean))] } : {}) };
+}
+
+export type InboxMessage = { id: string; text: string | null; at: string | null; senderId: string; senderName: string; recipientId: string; status: string; kind: string; attachment: boolean };
+export type InboxPage = { messages: InboxMessage[]; next: { sentBefore: string | null; receivedBefore: string | null } | null };
+export interface InboxConnector {
+  accountId: string;
+  list(cursor?: string): Promise<{ items: Array<{ userId: string; name: string; unread: boolean; lastMessageAt: string | null; preview: string | null }>; nextCursor: string | null }>;
+  history(userId: string, before?: { sentBefore?: string; receivedBefore?: string }): Promise<InboxPage>;
+  send(userId: string, text: string): Promise<{ messageId: string }>;
+}
+// Normalize only fields needed by the inbox. Do not persist provider payloads or media URLs.
+export function fanvueInbox(env: Env, credentials: Credential): InboxConnector {
+  const text = z.string().max(20000).nullable();
+  const person = z.object({ uuid: z.string().uuid(), handle: z.string().max(500) });
+  const message = z.object({ uuid: z.string().uuid(), text, sentAt: z.string().nullable(), sender: person, recipient: person, status: z.string(), type: z.string(), gif: z.unknown().optional() });
+  const query = (path: string) => fanvue(env, credentials.access_token, path);
+  const parse = <T>(schema: z.ZodType<T>, value: unknown): T => {
+    const result = schema.safeParse(value);
+    if (!result.success) throw new ProviderError(502);
+    return result.data;
+  };
+  return {
+    accountId: credentials.user.uuid,
+    async list(cursor) {
+      const params = new URLSearchParams({ size: '50' });
+      if (cursor) params.set('cursor', cursor);
+      const page = parse(z.object({ data: z.array(z.object({ user: person.extend({ displayName: z.string().max(500) }), isRead: z.boolean(), lastMessageAt: z.string().nullable(), lastMessage: z.object({ text }).nullable() })).max(50), nextCursor: z.string().nullable() }), await query(`/chats?${params}`));
+      return { items: page.data.map(item => ({ userId: item.user.uuid, name: item.user.displayName || item.user.handle, unread: !item.isRead, lastMessageAt: item.lastMessageAt, preview: item.lastMessage?.text || null })), nextCursor: page.nextCursor };
+    },
+    async history(userId, before = {}) {
+      const params = new URLSearchParams({ limit: '50', markAsRead: 'false', ...before });
+      const page = parse(z.object({ data: z.array(message).max(50), dateFilter: z.object({ sentBefore: z.string().nullable(), receivedBefore: z.string().nullable() }).nullable() }), await query(`/chats/${encodeURIComponent(userId)}/messages?${params}`));
+      if (page.data.some(item => !((item.sender.uuid === credentials.user.uuid && item.recipient.uuid === userId) || (item.sender.uuid === userId && item.recipient.uuid === credentials.user.uuid)))) throw new ProviderError(502);
+      return { messages: page.data.map(item => ({ id: item.uuid, text: item.text, at: item.sentAt, senderId: item.sender.uuid, senderName: item.sender.handle, recipientId: item.recipient.uuid, status: item.status, kind: item.type, attachment: !!item.gif })), next: page.dateFilter };
+    },
+    async send(userId, text) {
+      const result = await fanvue(env, credentials.access_token, `/chats/${encodeURIComponent(userId)}/message`, { method: 'POST', body: JSON.stringify({ text }) });
+      if (!z.string().uuid().safeParse(result.messageUuid).success) throw new ProviderError(502, 60, true);
+      return { messageId: result.messageUuid as string };
+    },
+  };
 }
 export async function fanvuePublish(env: Env, credentials: Credential, draft: Draft) {
   if (!draft.fanvue) throw new HubError(400, 'Fanvue audience and media settings are required');

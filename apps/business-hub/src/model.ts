@@ -2,7 +2,17 @@ import { z } from 'zod';
 
 export const roleSchema = z.enum(['reader', 'editor', 'publisher', 'owner', 'company']);
 export type Role = z.infer<typeof roleSchema>;
-export type Actor = { id: string; role: Role };
+export const engagementActionSchema = z.enum(['inbox:read', 'reply:draft', 'reply:send']);
+export const engagementGrantSchema = z.object({ channelId: z.string().min(1).max(150), actions: z.array(engagementActionSchema).min(1).max(3) }).strict();
+export type EngagementAction = z.infer<typeof engagementActionSchema>;
+export type EngagementGrant = z.infer<typeof engagementGrantSchema>;
+export type Actor = { id: string; role: Role; grants?: EngagementGrant[] };
+export function hasEngagementGrant(actor: Actor, action: EngagementAction, channelId?: string) {
+  if (actor.role === 'owner' || actor.role === 'company') return true;
+  const minimum = action === 'reply:send' ? 'publisher' : action === 'reply:draft' ? 'editor' : 'reader';
+  return ['reader', 'editor', 'publisher'].indexOf(actor.role) >= ['reader', 'editor', 'publisher'].indexOf(minimum)
+    && !!actor.grants?.some(grant => (!channelId || grant.channelId === channelId) && grant.actions.includes(action));
+}
 export const slugSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{2,59}$/);
 export const businessSchema = z.object({
   id: slugSchema,
@@ -84,8 +94,8 @@ export type Draft = DraftInput & {
   approvalBriefRevision?: number;
 };
 export type Channel = { id: string; name: string; provider: string; disabled?: boolean };
-export type Credential = { access_token: string; refresh_token: string; expires_at: number; user: { uuid: string; handle: string; displayName: string; isAiCreator?: boolean } };
-export type TokenRecord = { id: string; name: string; role: Role; createdAt: string; expiresAt: number; revoked?: boolean };
+export type Credential = { access_token: string; refresh_token: string; expires_at: number; scopes?: string[]; user: { uuid: string; handle: string; displayName: string; isAiCreator?: boolean } };
+export type TokenRecord = { id: string; name: string; role: Role; grants?: EngagementGrant[]; createdAt: string; expiresAt: number; revoked?: boolean };
 export class HubError extends Error {
   constructor(public status: number, message: string) { super(message); }
 }

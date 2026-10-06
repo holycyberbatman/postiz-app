@@ -1,6 +1,6 @@
 ---
-name: Postiz Business Hub
-description: A clear, business-scoped workspace for strategy and publishing operations.
+name: Wood Enterprises Content Service
+description: A clear, company-scoped workspace for content operations and audience conversations.
 colors:
   accent: "#612bd3"
   accent-dark: "#48199f"
@@ -116,17 +116,31 @@ components:
     textColor: "{colors.ink}"
     rounded: "{rounded.surface}"
     padding: "28px"
+  conversation-row:
+    backgroundColor: "{colors.paper}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body}"
+    padding: "20px"
+    width: "100%"
+  conversation-row-hover:
+    backgroundColor: "{colors.soft}"
+  conversation-row-current:
+    backgroundColor: "{colors.soft}"
+  conversation-entry:
+    textColor: "{colors.ink}"
+    typography: "{typography.body}"
+    padding: "20px 0"
 ---
 
-# Design System: Postiz Business Hub
+# Design System: Wood Enterprises Content Service
 
 ## Overview
 
 **Creative North Star: "The Clear Workspace"**
 
-Business Hub extends Postiz’s light interface with a quiet operating surface. Cool neutral ground, white work areas, and a single purple action color keep attention on the current business and its work. Typography is a compact system sans; hierarchy comes from size, weight, spacing, and explicit labels.
+The Wood Enterprises content service extends Postiz’s light interface with a quiet operating surface. Cool neutral ground, white work areas, and a single purple action color keep attention on the current company and its work. Typography is a compact system sans; hierarchy comes from size, weight, spacing, and explicit labels.
 
-The interface is practical and moderately dense. Tables, divided rows, and bordered forms organize working information without decorative imagery or visual elevation. Color supports action and confirmed state, while visible text distinguishes draft, submission, publication, failure, and uncertainty. This document records reusable rules from `public/app.css`, `public/app.js`, and `public/index.html`; the current surface composition remains in `SURFACE.md`.
+The interface is practical and moderately dense. Tables, divided rows, and bordered forms organize working information without decorative imagery or visual elevation. Color supports action and confirmed state, while visible text distinguishes draft, submission, publication, reply sending, failure, and uncertainty. This document records reusable rules from `public/app.css`, `public/app.js`, `public/inbox.js`, and `public/index.html`; the current surface composition remains in `SURFACE.md`.
 
 **Key Characteristics:**
 
@@ -144,12 +158,12 @@ The palette combines cool, low-chroma neutrals with a concentrated Postiz purple
 
 - **Postiz Purple — `accent`:** Primary buttons, links, the brand mark, and current navigation.
 - **Deep Purple — `accent-dark`:** The primary button hover state.
-- **Soft Lavender — `soft`:** Quiet contextual backgrounds, including business initials and the sign-in introduction.
+- **Soft Lavender — `soft`:** Quiet contextual backgrounds, including business initials and the sign-in introduction, plus hover and current states for conversation rows.
 - **Focus Purple — `focus`:** The shared visible keyboard focus outline.
 
 ### Secondary
 
-- **Confirmed Green — `success` / `success-ground`:** Active strategies and approved or published content, with a pale success background also used by notices.
+- **Confirmed Green — `success` / `success-ground`:** Active strategies, approved or published content, and sent replies, with a pale success background also used by notices.
 - **Attention Red — `danger` / `danger-ground`:** Failed or uncertain content and error feedback. The label always states which outcome applies.
 - **In-flight Blue — `pending` / `pending-ground`:** Scheduled and submitted content. These remain visually distinct from completed publication.
 - **Quiet Status Lavender — `status-ink` / `status-ground`:** Default badges, including draft and publishing-policy labels.
@@ -192,6 +206,8 @@ Forms use two equal columns with a group gutter. Reading/detail views pair the m
 
 At the phone breakpoint (`max-width: 760px`), main horizontal padding becomes smaller (20px), two-column forms and detail views become one column, content rows stack, and action groups align to the start. Panel padding reduces (22px). Workspace navigation stays on one line and can scroll horizontally; the current tab is brought into view. Tables retain horizontal overflow as needed. The portfolio hides its optional identifier column while preserving the business name and opening action.
 
+Conversation work pairs a selectable list and a reading pane inside one shared bordered surface. A vertical divider separates them on desktop; at the existing phone breakpoint, the list stacks above the reading pane and the divider becomes horizontal. The reading pane reuses panel padding on desktop and its smaller phone spacing. Metadata and action groups wrap, and long conversation text can break within a word to preserve the available width.
+
 Stack working groups on phones, preserve readable labels and actions, and use horizontal overflow for tabular or navigation content.
 
 ## Elevation & Depth
@@ -224,7 +240,7 @@ Workspace navigation is a horizontal line of semibold, sentence-case text. Inact
 
 ### Chips / Status Badges
 
-Badges are informational labels with compact padding, the badge radius, semibold status typography, and no interaction affordance. Default lavender labels support general states and policies. Active, approved, and published use green; failed and uncertain use red; scheduled and submitted use blue. Cancelled content uses muted neutral styling. Preserve the visible status wording even when multiple states share a color.
+Badges are informational labels with compact padding, the badge radius, semibold status typography, and no interaction affordance. Default lavender labels support general states and policies. Active, approved, published, and sent use green; failed and uncertain use red; scheduled and submitted use blue. Cancelled content uses muted neutral styling. Preserve the visible status wording even when multiple states share a color. A reply labeled “sent” records the sending outcome; its green treatment does not change that wording into a read or delivery claim.
 
 ### Cards / Containers
 
@@ -233,6 +249,18 @@ Reading panels and form shells share white paper, a thin divider border, surface
 ### Business Identity Rows
 
 The portfolio’s identifying row combines a lavender initials tile, a semibold business-name button, and a muted subtitle. The name changes to purple on hover, and the separate opening action uses the secondary button treatment. Keep identity and the action visible when optional metadata is hidden on phones.
+
+### Conversation Selection Rows
+
+Conversation rows are full-width, left-aligned buttons with square edges and a bottom divider. Each row groups a semibold name (650), a preview, and muted time and workflow metadata. Previews are limited to two lines; the selected conversation exposes its complete message text in the reading pane.
+
+Hover and current selection both use Soft Lavender on the existing white list. Current selection is also exposed with `aria-current="true"`; retain the shared visible keyboard focus outline. Row padding uses the standard spacing on desktop and tightens slightly on phones (18px). Opening a conversation moves focus to its heading, bringing the reading pane into view on phones.
+
+### Message and Reply Rows
+
+History entries and reply-review entries share flat, divided rows with standard vertical padding. Sender or status metadata sits above the body; the metadata uses caption-sized type, wraps as needed, and separates its ends with a related gap. The body preserves line breaks and wraps long text. Full message and reply bodies are not clamped like list previews.
+
+Reply composition and review groups use the existing section spacing and section-title typography. Review entries pair the status badge with the revision and time, then place available actions below the exact reply text. Action labels may wrap. Errors use the existing danger text, and confirmed reply outcomes reuse the existing status family rather than introducing a new palette or container treatment.
 
 ### Motion
 
@@ -247,6 +275,7 @@ Workspace entry uses one short arrival animation (180ms, ease-out), moving upwar
 - **Do** use the shared visible focus outline for interactive elements.
 - **Do** reflow forms and detail groups to a single column at the existing phone breakpoint.
 - **Do** use bordered panels for grouped work and dividers for repeated rows.
+- **Do** limit conversation previews while preserving complete, wrapping message and reply text in the reading pane.
 - **Do** honor reduced motion by disabling the workspace arrival animation.
 
 ### Don't:
